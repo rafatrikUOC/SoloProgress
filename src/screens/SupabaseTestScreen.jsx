@@ -26,71 +26,30 @@ export default function SupabaseTestScreen() {
 		fetchUsers();
 	}, []);
 
-	const dynamicStyles = createStyles(colors, typography);
+	const styles = createStyles(colors, typography);
 
-	if (loading) {
-		return (
-			<View style={dynamicStyles.container}>
-				<Text style={dynamicStyles.status}>Cargando usuarios...</Text>
-			</View>
-		);
-	}
-
-	return (
-		<ScrollView contentContainerStyle={dynamicStyles.container}>
-			<ThemeSelector />
-
-			{error ? (
-				<Text style={dynamicStyles.error}>Error: {error}</Text>
-			) : (
-				<>
-					<Text style={dynamicStyles.title}>Usuarios registrados:</Text>
-
-					{users.map((user) => (
-						<View key={user.id} style={dynamicStyles.userCard}>
-							<Text style={dynamicStyles.userName}>{user.name}</Text>
-							<Text style={dynamicStyles.text}>Nickname: {user.nickname}</Text>
-							<Text style={dynamicStyles.text}>Email: {user.email}</Text>
-							<Text style={dynamicStyles.text}>
-								Rol: {user.is_trainer ? "Entrenador" : "Alumno"}
-							</Text>
-							{user.photo_url && (
-								<Text style={dynamicStyles.photoUrl}>
-									Foto: {user.photo_url}
-								</Text>
-							)}
-						</View>
-					))}
-				</>
-			)}
-		</ScrollView>
-	);
-}
-
-// This function creates styles based on the current theme colors and typography
-const createStyles = (colors, typography) =>
 	StyleSheet.create({
 		container: {
 			flexGrow: 1,
 			padding: 20,
-			backgroundColor: colors.primaryBg,
+			backgroundColor: colors.body,
 		},
 		status: {
 			fontSize: typography.bodyMedium.fontSize,
 			fontFamily: typography.bodyMedium.fontFamily,
 			textAlign: "center",
 			marginTop: 20,
-			color: colors.fontText,
+			color: colors.text.white,
 		},
 		title: {
 			fontSize: typography.screenTitle.fontSize,
 			fontFamily: typography.screenTitle.fontFamily,
 			fontWeight: "bold",
 			marginBottom: 20,
-			color: colors.fontText,
+			color: colors.text.white,
 		},
 		userCard: {
-			backgroundColor: colors.secondaryBg,
+			backgroundColor: colors.card,
 			padding: 15,
 			borderRadius: 8,
 			marginBottom: 15,
@@ -101,25 +60,64 @@ const createStyles = (colors, typography) =>
 			fontFamily: typography.cardTitle.fontFamily,
 			fontWeight: "600",
 			marginBottom: 5,
-			color: colors.fontText,
+			color: colors.text.white,
 		},
 		text: {
 			fontSize: typography.bodyMedium.fontSize,
 			fontFamily: typography.bodyMedium.fontFamily,
-			color: colors.fontText,
+			color: colors.text.white,
 		},
 		photoUrl: {
 			fontSize: typography.bodySmall.fontSize,
 			fontFamily: typography.bodySmall.fontFamily,
-			color: colors.textSecondary,
+			color: colors.text.muted,
 			marginTop: 10,
 			fontStyle: "italic",
 		},
 		error: {
-			color: "#FF5252",
+			color: colors.text.danger,
 			fontSize: typography.bodyMedium.fontSize,
 			fontFamily: typography.bodyMedium.fontFamily,
 			textAlign: "center",
 			marginTop: 20,
 		},
 	});
+
+	if (loading) {
+		return (
+			<View style={styles.container}>
+				<Text style={styles.status}>Cargando usuarios...</Text>
+			</View>
+		);
+	}
+
+	return (
+		<ScrollView contentContainerStyle={styles.container}>
+			<ThemeSelector />
+
+			{error ? (
+				<Text style={styles.error}>Error: {error}</Text>
+			) : (
+				<>
+					<Text style={styles.title}>Usuarios registrados:</Text>
+
+					{users.map((user) => (
+						<View key={user.id} style={styles.userCard}>
+							<Text style={styles.userName}>{user.name}</Text>
+							<Text style={styles.text}>Nickname: {user.nickname}</Text>
+							<Text style={styles.text}>Email: {user.email}</Text>
+							<Text style={styles.text}>
+								Rol: {user.is_trainer ? "Entrenador" : "Alumno"}
+							</Text>
+							{user.photo_url && (
+								<Text style={styles.photoUrl}>
+									Foto: {user.photo_url}
+								</Text>
+							)}
+						</View>
+					))}
+				</>
+			)}
+		</ScrollView>
+	);
+}

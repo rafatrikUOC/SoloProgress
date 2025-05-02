@@ -8,13 +8,13 @@ export default function ExercisesScreen() {
 	const styles = StyleSheet.create({
 		container: {
 			flex: 1,
-			backgroundColor: colors.primaryBg,
+			backgroundColor: colors.body,
 			padding: 20,
 		},
 		title: {
-			fontFamily: typography.screenTitle.fontFamily,
+			fontFamily: typography.fontFamily,
 			fontSize: 24,
-			color: colors.fontText,
+			color: colors.text.white,
 			marginBottom: 20,
 		},
 	});

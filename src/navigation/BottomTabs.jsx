@@ -18,11 +18,11 @@ export default function BottomTabs() {
 		<Tab.Navigator
 			screenOptions={({ route }) => ({
 				headerShown: false,
-				tabBarActiveTintColor: colors.btnPrimary,
-				tabBarInactiveTintColor: colors.fontText,
+				tabBarActiveTintColor: colors.text.primary,
+				tabBarInactiveTintColor: colors.text.white,
 				tabBarIcon: ({ focused }) => {
 					let iconName;
-					const iconColor = focused ? colors.btnPrimary : colors.fontText;
+					const iconColor = focused ? colors.text.primary : colors.text.white;
 
 					switch (route.name) {
 						case "Home":
@@ -41,17 +41,17 @@ export default function BottomTabs() {
 
 					return <FontAwesome5 name={iconName} size={22} color={iconColor} />;
 				},
-				tabBarLabelStyle: ({  focused }) => ({
+				tabBarLabelStyle: ({ focused }) => ({
 					fontFamily: typography.fontFamily,
 					fontSize: 12,
-					color: focused ? colors.btnPrimary : colors.fontText,
+					color: focused ? colors.text.primary : colors.text.muted,
 				}),
 				tabBarStyle: {
 					height: 60,
 					paddingBottom: 8,
-					backgroundColor: colors.secondaryBg,
-					borderWidth: 1,
-					borderColor: colors.border || "transparent",
+					backgroundColor: colors.card,
+					borderTopWidth: 1,
+					borderTopColor: `${colors.border}4D`, // Adding 30% transparency to the border color
 				},
 			})}
 		>

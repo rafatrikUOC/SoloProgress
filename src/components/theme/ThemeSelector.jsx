@@ -1,10 +1,8 @@
 import React from "react";
 import { View, TouchableOpacity, Text, StyleSheet } from "react-native";
 import { useThemeContext } from "../../services/ThemeContext";
-import { colorSchemes } from "../../styles/colorSchemes";
 
-// Función para generar nombres amigables
-const getFriendlyName = (themeName) => {
+const getFriendlyName = (themeName: string) => {
 	switch (themeName) {
 		case "dark":
 			return "Modo Oscuro";
@@ -20,16 +18,16 @@ const getFriendlyName = (themeName) => {
 export const ThemeSelector = () => {
 	const { theme, setTheme, colors } = useThemeContext();
 
+	const themeOptions = ["dark", "light", "contrast"];
+
 	return (
 		<View style={styles.container}>
-			{Object.keys(colorSchemes).map((key) => (
+			{themeOptions.map((key) => (
 				<TouchableOpacity
 					key={key}
 					style={[
 						styles.themeOption,
-						theme === key && {
-							borderBottomColor: colors.btnPrimary,
-						},
+						theme === key && { borderBottomColor: colors.text.primary, borderBottomWidth: 2 },
 					]}
 					onPress={() => setTheme(key)}
 				>
@@ -37,14 +35,14 @@ export const ThemeSelector = () => {
 						style={[
 							styles.themePreview,
 							{
-								backgroundColor: colorSchemes[key].primaryBg,
-								borderColor: colorSchemes[key].fontText,
+								backgroundColor: colors.body,
+								borderColor: colors.text.white,
 							},
 						]}
 					>
-						<Text style={{ color: colorSchemes[key].fontText }}>Aa</Text>
+						<Text style={{ color: colors.text.white }}>Aa</Text>
 					</View>
-					<Text style={[styles.label, { color: colors.fontText }]}>
+					<Text style={[styles.label, { color: colors.text.white }]}>
 						{getFriendlyName(key)}
 					</Text>
 				</TouchableOpacity>
@@ -62,10 +60,6 @@ const styles = StyleSheet.create({
 	themeOption: {
 		alignItems: "center",
 		padding: 10,
-	},
-	activeTheme: {
-		borderBottomWidth: 2,
-		borderBottomColor: "#20B8CD",
 	},
 	themePreview: {
 		width: 50,
