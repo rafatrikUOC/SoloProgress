@@ -42,12 +42,12 @@ export default function Onboarding1({ navigation }) {
         button: {
             backgroundColor: colors.primary,
             padding: 10,
-            borderRadius: 5
+            borderRadius: 4
         },
     });
 
     return (
-        <TouchableWithoutFeedback onPress={() => navigation.replace("Onboarding2")}>
+        <TouchableWithoutFeedback onPress={() => navigation.navigate("Onboarding2")}>
             <ImageBackground
                 source={require("../../../assets/onboarding-bg-1.png")}
                 style={styles.background}

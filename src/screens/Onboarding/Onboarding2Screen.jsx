@@ -17,9 +17,44 @@ export default function Onboarding2({ navigation }) {
             ...StyleSheet.absoluteFillObject,
             backgroundColor: "#00000080",
         },
+        backButton: {
+          position: "absolute",
+          top: 48,
+          left: 24,
+          flexDirection: "row",
+          alignItems: "center",
+          paddingVertical: 6,
+          paddingHorizontal: 14,
+          backgroundColor: "rgba(0,0,0,0.4)",
+          borderRadius: 20,
+          zIndex: 10,
+        },
+        backText: {
+          ...typography.bodySmall,
+          color: colors.text.white,
+          marginLeft: 6,
+        },
+        skipButton: {
+            position: "absolute",
+            top: 48,
+            right: 32,
+            flexDirection: "row",
+            alignItems: "center",
+            paddingVertical: 6,
+            paddingHorizontal: 14,
+            backgroundColor: "rgba(0,0,0,0.4)",
+            borderRadius: 20,
+            zIndex: 10,
+            color: colors.text.primary
+        },
+        skipText: {
+            ...typography.bodySmall,
+            color: colors.text.primary,
+            marginRight: 6,
+        },
         centerArea: {
             backgroundColor: "rgba(0,0,0,0.6)",
-            borderRadius: 24,
+            borderRadius: 15,
             padding: 32,
             alignItems: "center",
             marginHorizontal: 32,
@@ -29,7 +64,7 @@ export default function Onboarding2({ navigation }) {
         },
         text: {
             ...typography.launchSubtitle,
-            color: colors.text.white,
+            color: "#FFFFFF",
             textAlign: "center",
             marginBottom: 24,
         },
@@ -55,7 +90,7 @@ export default function Onboarding2({ navigation }) {
             marginTop: 12,
         },
         button: {
-            borderRadius: 32,
+            borderRadius: 10,
             borderWidth: 1,
             borderColor: "#fff",
             paddingVertical: 14,
@@ -77,12 +112,27 @@ export default function Onboarding2({ navigation }) {
             resizeMode="cover"
         >
             <View style={styles.overlay} />
+
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+              <FontAwesome5 name="chevron-left" size={16} color={colors.text.white} />
+              <Text style={styles.backText}>Back</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+                style={styles.skipButton}
+                activeOpacity={0.7}
+                onPress={() => navigation.replace("Auth")}
+            >
+                <Text style={styles.skipText}>Skip</Text>
+                <FontAwesome5 name="chevron-right" size={16} color={colors.text.primary} />
+            </TouchableOpacity>
+            
             <View style={styles.centerArea}>
                 <FontAwesome5 name="running" size={48} color={colors.text.primary} style={styles.icon} />
                 <Text style={styles.text}>
-                    Descubre rutinas personalizadas y ejercicios para ti.
+                    Your path to personalized fitness starts here.
                 </Text>
-                {/* Barra de progreso: este es el paso 1 de 3 */}
+                {/* Barra de progreso: este es el paso 2 de 3 */}
                 <View style={styles.progressBar}>
                     <View style={[styles.bar, styles.barActive]} />
                     <View style={styles.bar} />
@@ -93,7 +143,7 @@ export default function Onboarding2({ navigation }) {
                 <TouchableOpacity
                     style={styles.button}
                     activeOpacity={0.8}
-                    onPress={() => navigation.replace("Onboarding3")}
+                    onPress={() => navigation.navigate("Onboarding3")}
                 >
                     <Text style={styles.buttonText}>Next</Text>
                 </TouchableOpacity>
