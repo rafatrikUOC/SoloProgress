@@ -1,8 +1,8 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import Onboarding1 from '../screens/Onboarding/Onboarding1Screen';
-import Onboarding2 from '../screens/Onboarding/Onboarding2Screen';
-import Onboarding3 from '../screens/Onboarding/Onboarding3Screen';
-import Onboarding4 from '../screens/Onboarding/Onboarding4Screen';
+import Onboarding1 from '../features/onboarding/screens/Onboarding1Screen';
+import Onboarding2 from '../features/onboarding/screens/Onboarding2Screen';
+import Onboarding3 from '../features/onboarding/screens/Onboarding3Screen';
+import Onboarding4 from '../features/onboarding/screens/Onboarding4Screen';
 import AuthStack from './AuthStack';
 
 const Stack = createNativeStackNavigator();

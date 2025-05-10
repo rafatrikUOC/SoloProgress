@@ -1,32 +1,33 @@
 {
-	"expo": {
-		"name": "SoloProgress",
-		"slug": "SoloProgress",
-		"version": "1.0.0",
-		"orientation": "portrait",
-		"icon": "./assets/icon.png",
-		"userInterfaceStyle": "light",
-		"newArchEnabled": true,
-		"splash": {
-			"image": "./assets/splash-icon.png",
-			"resizeMode": "contain",
-			"backgroundColor": "#ffffff"
-		},
-		"ios": {
-			"supportsTablet": true
-		},
-		"android": {
-			"adaptiveIcon": {
-				"foregroundImage": "./assets/adaptive-icon.png",
-				"backgroundColor": "#ffffff"
-			}
-		},
-		"web": {
-			"favicon": "./assets/favicon.png"
-		},
-		"extra": {
-			"SUPABASE_URL" : "https://azzjhknfengwyxxlkdls.supabase.co",
-			"SUPABASE_KEY" : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6empoa25mZW5nd3l4eGxrZGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA5NjI2MDIsImV4cCI6MjA1NjUzODYwMn0.jzX-m9hd1Dg9RrZrO30A4KiMyBweE7fEGqTISlWtSRw",
-		}
-	}
+  "expo": {
+    "name": "SoloProgress",
+    "slug": "SoloProgress",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.anonymous.SoloProgress"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "SUPABASE_URL": "https://azzjhknfengwyxxlkdls.supabase.co",
+      "SUPABASE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6empoa25mZW5nd3l4eGxrZGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA5NjI2MDIsImV4cCI6MjA1NjUzODYwMn0.jzX-m9hd1Dg9RrZrO30A4KiMyBweE7fEGqTISlWtSRw"
+    }
+  }
 }

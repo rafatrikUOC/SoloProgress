@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
-import { ThemeProvider } from "./services/ThemeContext";
-import BottomTabs from "./navigation/BottomTabs";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "react-native";
-import LaunchScreen from "./screens/LaunchScreen";
+import Toast from 'react-native-toast-message';
+
+import { ThemeProvider } from "./global/contexts/ThemeContext";
+import BottomTabs from "./navigation/BottomTabs";
 import OnboardingStack from "./navigation/OnboardingStack";
-import checkFirstLaunch from "./utils/isFirstLaunch";
+import checkFirstLaunch from "./global/utils/isFirstLaunch";
+import LaunchScreen from "./features/auth/screens/LaunchScreen";
 
 const App = () => {
   const [showLaunch, setShowLaunch] = useState(true);
@@ -39,6 +41,7 @@ const App = () => {
         <StatusBar barStyle="dark-content" />
         <NavigationContainer>
           {isFirstLaunch ? <OnboardingStack /> : <BottomTabs />}
+          <Toast />
         </NavigationContainer>
       </SafeAreaProvider>
     </ThemeProvider>

@@ -1,13 +1,7 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { useThemeContext } from "../services/ThemeContext";
-
-// Import screens
-import HomeScreen from "../screens/HomeScreen";
-import ExercisesScreen from "../screens/ExercisesScreen";
-import RoutinesScreen from "../screens/RoutinesScreen";
-import ProfileScreen from "../screens/ProfileScreen";
+import { useThemeContext } from "../global/contexts/ThemeContext";
 
 const Tab = createBottomTabNavigator();
 
@@ -51,14 +45,14 @@ export default function BottomTabs() {
 					paddingBottom: 8,
 					backgroundColor: colors.card,
 					borderTopWidth: 1,
-					borderTopColor: `${colors.border}4D`, // Adding 30% transparency to the border color
+					borderTopColor: `${colors.border}4D`,
 				},
 			})}
 		>
-			<Tab.Screen name="Home" component={HomeScreen} />
-			<Tab.Screen name="Exercises" component={ExercisesScreen} />
-			<Tab.Screen name="Routines" component={RoutinesScreen} />
-			<Tab.Screen name="Profile" component={ProfileScreen} />
+			{/* <Tab.Screen name="Home" component={require("../features/home/screens/HomeScreen").default} /> */}
+			{/* <Tab.Screen name="Exercises" component={require("../features/exercises/screens/ExercisesScreen").default} /> */}
+			{/* <Tab.Screen name="Routines" component={require("../features/routines/screens/RoutinesScreen").default} /> */}
+			{/* <Tab.Screen name="Profile" component={require("../features/profile/screens/ProfileScreen").default} /> */}
 		</Tab.Navigator>
 	);
 }
