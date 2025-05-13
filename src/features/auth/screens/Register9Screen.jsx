@@ -4,6 +4,7 @@ import { FontAwesome } from "@expo/vector-icons";
 import { useThemeContext } from "../../../global/contexts/ThemeContext";
 import { BackButton, ActionButton, HeaderBlock } from "../../../global/components/UIElements";
 import { getData, saveData } from "../../../global/utils/storage"; 
+import { checkIfUsernameExists } from "../services/authService";
 
 export default function Register9({ navigation }) {
   const { colors, typography } = useThemeContext();
@@ -44,11 +45,11 @@ export default function Register9({ navigation }) {
       return;
     }
 
-    const isAvailable = await checkUsernameAvailability(value);
-    if (!isAvailable) {
+    // Comprobar disponibilidad del correo
+    const existingUser = await checkIfUsernameExists(value);
+    if (existingUser) {
       setIsValid(false);
-      setError("Username is already taken");
-      await deleteUsernameData();
+      setError("Username is already registered");
       return;
     }
 

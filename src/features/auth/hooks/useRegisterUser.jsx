@@ -27,8 +27,6 @@ export const useRegisterUser = () => {
         password: hashedPassword,
       };
 
-
-  
       await registerUser(newUser);
   
       if (typeof onSuccess === "function") onSuccess();

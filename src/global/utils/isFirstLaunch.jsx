@@ -9,8 +9,8 @@ export default async function isFirstLaunch() {
       await AsyncStorage.setItem(HAS_LAUNCHED, "true");
       return true;
     }
-    return true; //!CAMBIAR LUEGO A FALSE
+    return false;
   } catch (error) {
-    return true; //!CAMBIAR LUEGO A FALSE
+    return false;
   }
 }

@@ -27,7 +27,11 @@
     },
     "extra": {
       "SUPABASE_URL": "https://azzjhknfengwyxxlkdls.supabase.co",
-      "SUPABASE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6empoa25mZW5nd3l4eGxrZGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA5NjI2MDIsImV4cCI6MjA1NjUzODYwMn0.jzX-m9hd1Dg9RrZrO30A4KiMyBweE7fEGqTISlWtSRw"
-    }
+      "SUPABASE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6empoa25mZW5nd3l4eGxrZGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA5NjI2MDIsImV4cCI6MjA1NjUzODYwMn0.jzX-m9hd1Dg9RrZrO30A4KiMyBweE7fEGqTISlWtSRw",
+      "eas": {
+        "projectId": "ef86a79d-6827-482f-8ed5-06daf617e57c"
+      }
+    },
+    "owner": "rafatrik"
   }
 }

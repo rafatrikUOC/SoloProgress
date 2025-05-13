@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { NavigationContainer } from "@react-navigation/native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "react-native";
-import Toast from 'react-native-toast-message';
-
 import { ThemeProvider } from "./global/contexts/ThemeContext";
-import BottomTabs from "./navigation/BottomTabs";
-import OnboardingStack from "./navigation/OnboardingStack";
-import checkFirstLaunch from "./global/utils/isFirstLaunch";
+import { UserProvider } from "./global/contexts/UserContext";
 import LaunchScreen from "./features/auth/screens/LaunchScreen";
+import checkFirstLaunch from "./global/utils/isFirstLaunch";
+import RootNavigator from "./navigation/RootNavigator";
 
 const App = () => {
   const [showLaunch, setShowLaunch] = useState(true);
@@ -31,19 +28,16 @@ const App = () => {
     );
   }
 
-  if (isFirstLaunch === null) {
-    return null;
-  }
+  if (isFirstLaunch === null) return null;
 
   return (
     <ThemeProvider>
-      <SafeAreaProvider>
-        <StatusBar barStyle="dark-content" />
-        <NavigationContainer>
-          {isFirstLaunch ? <OnboardingStack /> : <BottomTabs />}
-          <Toast />
-        </NavigationContainer>
-      </SafeAreaProvider>
+      <UserProvider>
+        <SafeAreaProvider>
+          <StatusBar barStyle="dark-content" />
+          <RootNavigator isFirstLaunch={isFirstLaunch} />
+        </SafeAreaProvider>
+      </UserProvider>
     </ThemeProvider>
   );
 };

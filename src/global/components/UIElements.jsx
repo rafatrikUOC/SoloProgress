@@ -129,6 +129,29 @@ export function HeaderBlock({ title, subtitle, sx }) {
 }
 
 
+export function ScreenTitle({ title, sx }) {
+  const { colors, typography } = useThemeContext();
+
+  const styles = StyleSheet.create({
+    title: {
+      ...typography.secondaryMd,
+      color: colors.text.white,
+      marginBottom: 24,
+      textAlign: "center",
+      marginTop: 32,
+      fontWeight: "800",
+      ...sx?.title,
+    },
+  });
+
+  return (
+    <View style={{ alignItems: "center", marginTop: 32 }}>
+      <Text style={styles.title}>{title}</Text>
+    </View>
+  );
+}
+
+
 
 // Overlay de fondo oscuro semitransparente
 export function Overlay() {
