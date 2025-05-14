@@ -146,32 +146,3 @@ export const UserProvider = ({ children }) => {
     </UserContext.Provider>
   );
 };
-
-const updateSelectedRoutine = async (userId, splitId) => {
-	if (!userId || !splitId) return false;
-	
-	setLoading(l => ({ ...l, settings: true }));
-	setError(e => ({ ...e, settings: null }));
-	
-	try {
-	  const { data, error } = await supabase
-		.from("UserSettings")
-		.update({ selected_routine: splitId })
-		.eq("user_id", userId)
-		.select()
-		.single();
-		
-	  if (error) throw error;
-	  
-	  // Update local state
-	  setUser(u => ({ ...u, settings: data }));
-	  // Load selected split
-	  await fetchUserSplit(splitId);
-	  return true;
-	} catch (err) {
-	  setError(e => ({ ...e, settings: err.message || "Error updating routine" }));
-	  return false;
-	} finally {
-	  setLoading(l => ({ ...l, settings: false }));
-	}
-  };
