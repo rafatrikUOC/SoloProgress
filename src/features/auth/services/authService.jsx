@@ -22,13 +22,12 @@ export const registerUser = async (data) => {
       throw new Error("Username already in use.");
     }
 
-
     // Insert user into Users table
     const { data: insertedUser, error: userError } = await supabase.from("Users").insert([
       {
         username: username,
         email: email,
-        password_hash: password,  // Store password hash
+        password_hash: password,
         gender: gender,
       },
     ])
@@ -54,6 +53,8 @@ export const registerUser = async (data) => {
         performance_data: JSON.stringify({
           activity_level: activityLevel,
         }), // Store activity level in performance_data
+        weekly_goal: 6, //Default one
+        selected_routine: 1, //Default one
       },
     ]);
 
@@ -94,10 +95,11 @@ export const registerUser = async (data) => {
 // Check if a user already exists with the given email
 export const checkIfEmailExists = async (email) => {
   try {
+    const normalizedEmail = email.toLowerCase().trim();;
     const { data, error } = await supabase
       .from("Users")
       .select("email")
-      .eq("email", email)
+      .ilike("email", normalizedEmail)
       .single();
 
     if (error) return null; // Email not found
@@ -111,10 +113,11 @@ export const checkIfEmailExists = async (email) => {
 // Check if a user already exists with the given username
 export const checkIfUsernameExists = async (username) => {
   try {
+    const normalizedUsername = username.toLowerCase();
     const { data, error } = await supabase
       .from("Users")
       .select("username")
-      .eq("username", username)
+      .ilike("username", normalizedUsername)
       .single();
 
     if (error) return null; // Username not found
@@ -125,29 +128,43 @@ export const checkIfUsernameExists = async (username) => {
   }
 };
 
-// Authenticate a user with email and password
 export const loginUser = async (email, password) => {
-  try {
-    const { data, error } = await supabase
-      .from("Users")
+  // 1. Authenticate user
+  const normalizedEmail = email.toLowerCase().trim();
+  const { data: users, error: userError } = await supabase
+    .from("Users")
+    .select("*")
+    .ilike("email", normalizedEmail)
+    .eq("password_hash", password);
+
+  if (userError) throw new Error(userError.message);
+  if (!users || users.length === 0) throw new Error("No user found with this email.");
+  const user = users[0];
+
+  // 2. Fetch user settings
+  const { data: settings, error: settingsError } = await supabase
+    .from("UserSettings")
+    .select("*")
+    .eq("user_id", user.id)
+    .single();
+  if (settingsError) throw new Error(settingsError.message);
+
+  // 3. Fetch split (if there is a selected routine)
+  let split = null;
+  if (settings.selected_routine) {
+    const { data: splitData, error: splitError } = await supabase
+      .from("TrainingSplits")
       .select("*")
-      .eq("email", email)
-      .eq("password_hash", password)
+      .eq("id", settings.selected_routine)
       .single();
-
-    if (error) throw new Error(error.message);
-
-    // Compare provided password (plaintext) with stored hash (for demo purposes)
-    if (data.password_hash !== password) {
-      throw new Error("Incorrect password.");
-    }
-
-    return data;
-  } catch (error) {
-    console.error("Error logging in user:", error);
-    throw error;
+    if (splitError) throw new Error(splitError.message);
+    split = splitData;
   }
+
+  // 4. Return all user data
+  return { info: user, settings, split };
 };
+
 
 // Fetch a single user by ID
 export const getUserById = async (userId) => {
@@ -169,10 +186,11 @@ export const getUserById = async (userId) => {
 // Fetch a userid by its email
 export const getUserIDByEmail = async (email) => {
   try {
+    const normalizedEmail = email.toLowerCase().trim();;
     const { data, error } = await supabase
       .from("Users")
       .select("id")
-      .eq("email", email)
+      .ilike("email", normalizedEmail)
       .single();
 
     if (error) throw new Error(error.message);
@@ -186,10 +204,11 @@ export const getUserIDByEmail = async (email) => {
 // Fetch a userid by username
 export const getUserIDByUsername = async (username) => {
   try {
+    const normalizedUsername = username.toLowerCase();
     const { data, error } = await supabase
       .from("Users")
       .select("id")
-      .eq("username", username)
+      .ilike("username", normalizedUsername)
       .single();
 
     if (error) throw new Error(error.message);

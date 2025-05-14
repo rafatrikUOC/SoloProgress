@@ -1,22 +1,40 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useContext } from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  TouchableWithoutFeedback
 } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { useThemeContext } from "../../../global/contexts/ThemeContext";
-import { SkipButton } from "../../../global/components/UIElements";
 import ToastMessage from "../../../global/components/ToastMessage";
+import { UserContext } from "../../../global/contexts/UserContext";
+import { useLogin } from "../hooks/useLogin";
 
 export default function LoginScreen({ navigation, route }) {
   const { colors, typography } = useThemeContext();
+  const [showPassword, setShowPassword] = useState(false);
+  const { setUser } = useContext(UserContext);
+  const { login, loading, error: loginError } = useLogin();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
-  console.log("Entra login")
+  const handleLogin = async () => {
+    try {
+      const user = await login(email, password);
+      if (user && user.info) {
+        setUser(user);
+        setError("");
+      } else {
+        setError("Login did not return a valid user.");
+      }
+    } catch (err) {
+      setError(err.message || "Login failed");
+    }
+  };
+  
 
   const styles = StyleSheet.create({
     container: {
@@ -47,12 +65,23 @@ export default function LoginScreen({ navigation, route }) {
       textAlign: "center",
     },
     input: {
-      ...colors.input,
+      flex: 1,
+      color: colors.input.color || colors.input.text,
       ...typography.input,
-      borderRadius: 4,
-      padding: 16,
-      marginBottom: 12,
+      paddingVertical: 16,
+    },
+    inputWrapper: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.input.background,
       borderWidth: 1,
+      borderRadius: 4,
+      paddingHorizontal: 12,
+      marginBottom: 12,
+      borderColor: colors.input.borderColor || colors.border,
+    },
+    eye: {
+      padding: 8,
     },
     forgotContainer: {
       flexDirection: "row",
@@ -94,53 +123,86 @@ export default function LoginScreen({ navigation, route }) {
       marginLeft: 4,
       textDecorationLine: "underline",
     },
+    errorText: {
+      color: colors.text.danger,
+      ...typography.bodySmall,
+      marginBottom: 12,
+      textAlign: "center",
+    },
   });
 
   return (
     <View style={styles.container}>
+      {/* Show success toast after registration */}
       {route.params?.registrationSuccess && (
         <ToastMessage
           message={"Account created successfully"}
-          type={"success"} 
+          type={"success"}
         />
       )}
 
-      {/* Welcome section */}
+      {/* Welcome message */}
       <View style={styles.welcomeContainer}>
         <Text style={styles.welcomeTitle}>Welcome</Text>
         <Text style={styles.welcomeSubtitle}>Your next workout awaits</Text>
         <Text style={styles.welcomeText}>Log back in and keep progressing</Text>
       </View>
 
-      <SkipButton onPress={() => navigation.navigate("Register10")} />
+      {/* Email input field */}
+      <View style={styles.inputWrapper}>
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
+          placeholderTextColor={colors.text.muted}
+          autoCapitalize="none"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          textContentType="emailAddress"
+        />
+      </View>
 
-      {/* Login form */}
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        placeholderTextColor={colors.text.muted}
-        autoCapitalize="none"
-        value={email}
-        onChangeText={setEmail}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        placeholderTextColor={colors.text.muted}
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
+      {/* Password input field with visibility toggle */}
+      <View style={styles.inputWrapper}>
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          placeholderTextColor={colors.text.muted}
+          secureTextEntry={!showPassword}
+          value={password}
+          onChangeText={setPassword}
+          autoCapitalize="none"
+          textContentType="password"
+        />
+        <TouchableOpacity
+          onPress={() => setShowPassword((prev) => !prev)}
+          style={styles.eye}
+          accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+        >
+          <Feather
+            name={showPassword ? "eye-off" : "eye"}
+            size={20}
+            color={colors.input.placeholder}
+          />
+        </TouchableOpacity>
+      </View>
+
+      {/* Display error message */}
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+      {/* Forgot password link */}
       <View style={styles.forgotContainer}>
         <TouchableOpacity onPress={() => navigation.navigate("ForgotPassword")}>
           <Text style={styles.forgotLink}>Forgot password?</Text>
         </TouchableOpacity>
       </View>
-      <TouchableOpacity style={styles.button}>
+
+      {/* Login button */}
+      <TouchableOpacity style={styles.button} onPress={handleLogin}>
         <Text style={styles.buttonText}>Log in</Text>
       </TouchableOpacity>
 
-      {/* Register section */}
+      {/* Sign up link */}
       <View style={styles.registerContainer}>
         <Text style={styles.registerText}>Don't have an account?</Text>
         <TouchableOpacity onPress={() => navigation.navigate("Register1")}>

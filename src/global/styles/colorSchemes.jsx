@@ -5,6 +5,7 @@ export const colorSchemes = {
 	dark: {
 		body: "#191A1A",
 		card: "#202222",
+		cardActive: "#3c4040",
 		bg: {
 			primary: "#20B8CD",
 			secondary: "#2D2F2F",

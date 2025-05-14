@@ -4,6 +4,7 @@ import { FontAwesome } from "@expo/vector-icons";
 import { useThemeContext } from "../../../global/contexts/ThemeContext";
 import { BackButton, ActionButton, HeaderBlock } from "../../../global/components/UIElements";
 import { saveData, getData } from "../../../global/utils/storage";
+import { checkIfEmailExists } from "../services/authService";
 
 export default function Register8({ navigation }) {
   const { colors, typography } = useThemeContext();
@@ -15,7 +16,7 @@ export default function Register8({ navigation }) {
   useEffect(() => {
     const loadEmail = async () => {
       const registrationData = await getData("registrationData");
-      if (registrationData && registrationData.email) {
+      if (registrationData?.email) {
         setEmail(registrationData.email);
       }
     };
@@ -36,7 +37,7 @@ export default function Register8({ navigation }) {
     if (!value) {
       setIsValid(false);
       setError("");
-      await deleteEmailData();  // Eliminar los datos si el campo está vacío
+      await deleteEmailData();
       return;
     }
 
@@ -44,16 +45,16 @@ export default function Register8({ navigation }) {
     if (!emailRegex.test(value)) {
       setIsValid(false);
       setError("Invalid email format");
-      await deleteEmailData();  // Eliminar los datos si el formato es inválido
+      await deleteEmailData();
       return;
     }
 
     // Comprobar disponibilidad del correo
-    const isAvailable = await checkEmailAvailability(value);
-    if (!isAvailable) {
+    const existingUser = await checkIfEmailExists(value);
+    if (existingUser) {
       setIsValid(false);
       setError("Email is already registered");
-      await deleteEmailData();  // Eliminar los datos si ya está registrado
+      await deleteEmailData();
       return;
     }
 
@@ -72,11 +73,6 @@ export default function Register8({ navigation }) {
     const registrationData = await getData("registrationData") || {};
     delete registrationData.email;  // Eliminar correo de registrationData
     await saveData("registrationData", registrationData);  // Guardar los datos actualizados sin el correo
-  };
-
-  const checkEmailAvailability = async (value) => {
-    // TODO: Reemplazar esto con una llamada real a Supabase o tu backend
-    return true;
   };
 
   const styles = StyleSheet.create({
