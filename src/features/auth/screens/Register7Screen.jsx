@@ -14,16 +14,20 @@ import { saveData, getData } from "../../../global/utils/storage";
 
 const ACTIVITY_LEVELS = [
   {
+    label: "No experience",
+    description: "You have never exercised or are completely new to fitness. The focus will be on introducing basic movements, building confidence, and establishing a foundation for regular physical activity.",
+  },
+  {
     label: "Beginner",
-    description: "You are just starting out with exercise or have little consistent experience in fitness. Your focus will be on building foundational strength, improving mobility, and learning proper form.",
+    description: "You have minimal experience with exercise or have not trained consistently. The goal is to develop foundational strength, improve mobility, and learn proper exercise technique.",
   },
   {
     label: "Intermediate",
-    description: "You have been training consistently for a while and are comfortable with most exercises. You are ready to increase intensity and target specific fitness goals such as muscle growth or improving endurance.",
+    description: "You have been exercising regularly and are comfortable with common exercises and equipment. You are ready to increase intensity, diversify your workouts, and pursue specific fitness goals.",
   },
   {
     label: "Advanced",
-    description: "You have extensive training experience and are capable of handling high-intensity workouts. Your focus is on pushing your limits, improving performance, and refining advanced techniques.",
+    description: "You have significant training experience and can handle high-intensity, complex workouts. Your focus is on optimizing performance, mastering advanced techniques, and pushing your physical limits.",
   },
 ];
 

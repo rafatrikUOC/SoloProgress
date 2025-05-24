@@ -67,7 +67,7 @@ export const colorSchemes = {
 			muted: "#5A5A5A",
 			white: "#2D2D2D",
 			black: "#FFFFFF",
-			success: "#00BFA5",
+			success: "#27ae60",
 			warning: "#FFEB3B",
 			danger: "#FF5252",
 			info: "#2196F3",

@@ -56,6 +56,28 @@ export default function Register2({ navigation }) {
     genderButton: {
       alignItems: "center",
     },
+    textButton: {
+      backgroundColor: colors.body,
+      marginHorizontal: "auto",
+      paddingVertical: 16,
+      paddingHorizontal: 24,
+      borderRadius: 32,
+      marginTop: 24,
+      alignItems: "center",
+      borderWidth: 2,
+      borderColor: colors.text.primary,
+    },
+    textButtonSelected: {
+      backgroundColor: colors.text.primary,
+    },
+    textButtonLabel: {
+      ...typography.bodyLarge,
+      color: colors.text.primary,
+    },
+    textButtonLabelSelected: {
+      color: colors.text.white,
+      fontWeight: "bold",
+    },
     circle: {
       width: 175,
       height: 175,
@@ -156,6 +178,26 @@ export default function Register2({ navigation }) {
             Female
           </Text>
         </TouchableOpacity>
+
+        {/* Prefer not to specify button */}
+        <TouchableOpacity
+          style={[
+            styles.textButton,
+            selectedGender === "unspecified" && styles.textButtonSelected,
+          ]}
+          onPress={() => handleGenderSelection("unspecified")}
+          activeOpacity={0.8}
+        >
+          <Text
+            style={[
+              styles.textButtonLabel,
+              selectedGender === "unspecified" && styles.textButtonLabelSelected,
+            ]}
+          >
+            I prefer not to specify
+          </Text>
+        </TouchableOpacity>
+
       </View>
 
       <ActionButton

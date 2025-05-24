@@ -1,17 +1,22 @@
-import React, { useContext } from "react";
+import React, { useState, useContext, useRef } from "react";
 import {
   View,
   Text,
   ScrollView,
+  Modal,
+  Dimensions,
   TouchableOpacity,
   StyleSheet,
   Image,
   FlatList,
+  ActivityIndicator,
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useThemeContext } from "../../../global/contexts/ThemeContext";
-import { UserContext } from "../../../global/contexts/UserContext"; 
+import { UserContext } from "../../../global/contexts/UserContext";
+import { supabase } from "../../../global/services/supabaseService";
 
+const SCREEN_WIDTH = Dimensions.get("window").width;
 const SLIDER_IMAGES = Array(6).fill({ uri: "" });
 const DEFAULT_IMAGE = "https://via.placeholder.com/60?text=No+Image";
 
@@ -24,32 +29,334 @@ const EXERCISES = [
   "Overhead triceps extension",
 ];
 
-// Workout recovery
+// Returns a color from the palette based on recovery value
 const getRecoveryColor = (value, colors) => {
-  if (value >= 80) return "#27ae60"; // Green
-  if (value >= 50) return "#f1c40f"; // Yellow
-  if (value >= 20) return "#e67e22"; // Orange
-  return "#e74c3c";                  // Red
+  if (value >= 80) return colors.text.success;
+  if (value >= 50) return colors.text.warning;
+  if (value >= 20) return colors.text.info;
+  return colors.text.danger;
 };
 
-export default function HomeScreen({ navigation }) {
-  const { colors } = useThemeContext();
-  const { user } = useContext(UserContext);
-  const recoveryValue = 82;
+// Async fetch for gym details and equipment count using Supabase
+async function fetchGymDetailsById(gym_id) {
+  const { data, error: fetchError } = await supabase
+    .from("Gyms")
+    .select("*")
+    .eq("id", gym_id)
+    .single();
 
+  if (fetchError || !data) {
+    return {
+      id: gym_id,
+      name: "Unknown",
+      location: "",
+      equipmentCount: 0,
+    };
+  }
+
+  // Count equipment items from the JSON field
+  let equipmentCount = 0;
+  if (Array.isArray(data.equipment)) {
+    equipmentCount = data.equipment.length;
+  } else if (typeof data.equipment === "string") {
+    try {
+      const parsed = JSON.parse(data.equipment);
+      if (Array.isArray(parsed)) {
+        equipmentCount = parsed.length;
+      }
+    } catch (e) {
+      equipmentCount = 0;
+    }
+  }
+
+  return {
+    id: gym_id,
+    name: data.name,
+    location: data.location || "",
+    equipmentCount,
+  };
+}
+
+export default function HomeScreen({ navigation }) {
+  const { colors, typography } = useThemeContext();
+  const { user, refreshUser } = useContext(UserContext);
+
+  // Get gyms and active gym from user.settings.performance_data
+  const storedGyms = user?.settings?.performance_data?.stored_gyms || [];
+  const activeGym = user?.settings?.performance_data?.active_gym || null;
+
+  // State for modal
+  const [menuGymId, setMenuGymId] = useState(null);
+  const [gymModalVisible, setGymModalVisible] = useState(false);
+  const [gymsDetails, setGymsDetails] = useState([]);
+  const [gymsLoading, setGymsLoading] = useState(false);
+
+  // Local active gym for immediate UI feedback
+  const [localActiveGym, setLocalActiveGym] = useState(activeGym);
+
+  // Always fetch gyms when opening modal (so it's always up to date)
+  const loadGymsDetails = async () => {
+    setGymsLoading(true);
+    try {
+      const gyms = await Promise.all(
+        storedGyms.map((gymId) => fetchGymDetailsById(gymId))
+      );
+      setGymsDetails(gyms);
+    } catch (e) {
+      setGymsDetails([]);
+    }
+    setGymsLoading(false);
+  };
+
+  // Open modal and fetch gyms
+  const handleOpenGymModal = () => {
+    setGymModalVisible(true);
+    loadGymsDetails();
+    setLocalActiveGym(activeGym);
+  };
+
+  const handleSelectGym = async (gymId) => {
+    if (!gymId || isNaN(gymId)) {
+      console.error(`[Gym] Invalid gymId for selection:`, gymId);
+      return;
+    }
+
+    setLocalActiveGym(gymId);
+    setGymModalVisible(false);
+
+    // Update database and refresh context
+    const { error } = await supabase
+      .from("UserSettings")
+      .update({
+        performance_data: {
+          ...user.settings.performance_data,
+          active_gym: gymId,
+        }
+      })
+      .eq("user_id", user.info.id);
+
+    if (!error) {
+      refreshUser && refreshUser();
+    } else {
+      console.error(`[Gym] Error updating active gym:`, error);
+    }
+  };
+
+
+  // Delete gym handler (removes from user settings and Supabase)
+  const deleteGym = async (gymId) => {
+    closeGymMenu();
+
+    // Remove from stored_gyms
+    const newStoredGyms = storedGyms.filter(id => id !== gymId);
+
+    // Determine new active gym
+    let newActiveGym = localActiveGym;
+    if (localActiveGym === gymId) {
+      newActiveGym = newStoredGyms.length > 0 ? Number(newStoredGyms[0]) : null;
+    }
+
+    // Update user settings in Supabase
+    const { error: updateError } = await supabase
+      .from("UserSettings")
+      .update({
+        performance_data: {
+          ...user.settings.performance_data,
+          stored_gyms: newStoredGyms,
+          active_gym: newActiveGym,
+        }
+      })
+      .eq("user_id", user.info.id);
+
+    if (!updateError) {
+      // Remove from Gyms table
+      const { error: gymDeleteError } = await supabase
+        .from("Gyms")
+        .delete()
+        .eq("id", gymId);
+
+      if (!gymDeleteError) {
+      } else {
+        console.error(`[Gym] Error deleting gym from Gyms table:`, gymDeleteError);
+      }
+
+      // Update local state for UI
+      setGymsDetails(prev => prev.filter(g => g.id !== gymId));
+      setLocalActiveGym(newActiveGym);
+
+      refreshUser && refreshUser();
+      if (newActiveGym) {
+      } else {
+      }
+    } else {
+      console.error(`[Gym] Error updating user settings:`, updateError);
+    }
+  };
+
+
+
+  // Open ellipsis menu for a gym
+  const openGymMenu = (gymId) => setMenuGymId(gymId);
+
+  // Close ellipsis menu
+  const closeGymMenu = () => setMenuGymId(null);
+
+  // Modal styles only
+  const modalStyles = StyleSheet.create({
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.6)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 20,
+    },
+    modalContainer: {
+      backgroundColor: colors.bg.secondary,
+      borderRadius: 16,
+      padding: 24,
+      width: "100%",
+      elevation: 4,
+    },
+    modalTitle: {
+      ...typography.bodyLarge,
+      marginBottom: 12,
+      color: colors.text.primary,
+    },
+    modalText: {
+      ...typography.bodyMedium,
+      color: colors.text.white,
+      marginBottom: 24
+    },
+    modalButton: {
+      backgroundColor: colors.bg.primary,
+      paddingVertical: 12,
+      borderRadius: 12,
+      alignItems: "center",
+    },
+    gymItem: {
+      backgroundColor: colors.card,
+      borderColor: colors.text.white,
+      borderWidth: 1,
+      padding: 16,
+      borderRadius: 12,
+      marginBottom: 12,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      minHeight: 56,
+      marginRight: 12,
+    },
+    gymInfoContainer: {
+      flex: 1,
+      minWidth: 0,
+    },
+    gymNameRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      minWidth: 0,
+    },
+    gymName: {
+      ...typography.bodyMedium,
+      color: colors.text.white,
+      fontWeight: "bold",
+      fontSize: 16,
+      maxWidth: 160,
+      overflow: "hidden",
+      flexShrink: 1,
+      flexGrow: 0,
+    },
+    gymLocation: {
+      color: colors.text.white,
+      opacity: 0.8,
+      fontSize: 12,
+    },
+    gymEquipment: {
+      color: colors.text.white,
+      fontSize: 12,
+      marginTop: 2,
+      opacity: 0.8,
+    },
+    noGymsText: {
+      ...typography.bodySmall,
+      color: colors.text.white,
+      fontStyle: "italic",
+      marginBottom: 12,
+      textAlign: "center",
+    },
+    loadingText: {
+      color: colors.text.white,
+      marginTop: 16,
+      marginBottom: 8,
+      textAlign: "center",
+    },
+    closeButton: {
+      position: "absolute",
+      top: 24,
+      right: 24,
+    },
+    ellipsisButton: {
+      marginLeft: 8,
+      padding: 8,
+      zIndex: 10,
+    },
+    ellipsisMenu: {
+      position: "absolute",
+      right: 36,
+      top: 16,
+      backgroundColor: colors.card,
+      borderRadius: 8,
+      paddingVertical: 4,
+      paddingHorizontal: 8,
+      elevation: 4,
+      zIndex: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    ellipsisMenuItem: {
+      paddingVertical: 8,
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    ellipsisMenuText: {
+      color: colors.text.primary,
+      marginLeft: 8,
+    },
+    ellipsisMenuDeleteText: {
+      color: colors.text.danger,
+      marginLeft: 8,
+    },
+    addButton: {
+      marginTop: 24,
+      backgroundColor: colors.bg.primary,
+      paddingVertical: 14,
+      borderRadius: 12,
+      alignItems: "center",
+    },
+    addButtonText: {
+      ...typography.bodyMedium,
+      color: colors.text.white,
+    },
+  });
+
+  // Rest of the page styles
   const styles = StyleSheet.create({
     scrollView: {
       flex: 1,
       backgroundColor: colors.body,
     },
     container: {
-      padding: 24,
+      padding: 24
     },
     header: {
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
       marginBottom: 24,
+    },
+    drawerWelcome: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4
     },
     greeting: {
       fontSize: 24,
@@ -60,6 +367,51 @@ export default function HomeScreen({ navigation }) {
     subGreeting: {
       fontSize: 16,
       color: colors.text.white,
+    },
+    gymIcon: {
+      marginHorizontal: 8,
+    },
+    gymTitle: {
+      ...typography.bodyLarge,
+      color: colors.text.primary,
+      marginBottom: 16,
+    },
+    gymItem: {
+      backgroundColor: colors.bg.primary,
+      padding: 16,
+      borderRadius: 12,
+      marginBottom: 12,
+    },
+    gymName: {
+      ...typography.bodyMedium,
+      color: colors.text.white,
+    },
+    gymLocation: {
+      color: colors.text.white,
+      opacity: 0.8,
+      fontSize: 12,
+    },
+    addButton: {
+      marginTop: 24,
+      backgroundColor: colors.bg.accent,
+      paddingVertical: 14,
+      borderRadius: 12,
+      alignItems: "center",
+    },
+    addButtonText: {
+      ...typography.bodyMedium,
+      color: colors.text.white,
+    },
+    noGymsText: {
+      ...typography.bodySmall,
+      color: colors.text.secondary,
+      fontStyle: "italic",
+      marginBottom: 12,
+    },
+    closeButton: {
+      position: "absolute",
+      top: 24,
+      right: 24,
     },
     sectionTitle: {
       fontSize: 18,
@@ -311,18 +663,30 @@ export default function HomeScreen({ navigation }) {
     },
   });
 
+  // Example recovery value
+  const recoveryValue = 82;
+
   return (
     <ScrollView style={styles.scrollView}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>
-              Hi, {user.info.username}
-            </Text>
-            <Text style={styles.subGreeting}>
-              It's time to challenge your limits.
-            </Text>
+          <View style={styles.drawerWelcome}>
+            <TouchableOpacity
+              onPress={handleOpenGymModal}
+              style={{ marginHorizontal: 8 }}
+              activeOpacity={0.6}
+            >
+              <FontAwesome5 name="landmark" size={24} color={colors.text.primary + "DD"} />
+            </TouchableOpacity>
+            <View>
+              <Text style={styles.greeting}>
+                Hi, {user.info.username}
+              </Text>
+              <Text style={styles.subGreeting}>
+                It's time to challenge your limits.
+              </Text>
+            </View>
           </View>
           <TouchableOpacity onPress={() => navigation.navigate("FitnessPlan")}>
             <FontAwesome5 name="sliders-h" size={24} color={colors.text.primary} />
@@ -475,6 +839,136 @@ export default function HomeScreen({ navigation }) {
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* Gym list modal */}
+        <Modal
+          visible={gymModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setGymModalVisible(false)}
+        >
+          <View style={modalStyles.modalOverlay}>
+            <View style={modalStyles.modalContainer}>
+              <Text style={modalStyles.modalTitle}>Select your gym</Text>
+              <View style={{ maxHeight: 320, marginBottom: 16 }}>
+                {gymsLoading ? (
+                  <View style={{ alignItems: "center", justifyContent: "center", flex: 1, height: 200 }}>
+                    <ActivityIndicator size="large" color={colors.text.white} />
+                    <Text style={modalStyles.loadingText}>Loading gyms...</Text>
+                  </View>
+                ) : gymsDetails.length === 0 ? (
+                  <Text style={modalStyles.noGymsText}>No gyms saved yet.</Text>
+                ) : (
+                  <ScrollView contentContainerStyle={{ paddingBottom: 32, paddingTop: 8 }}>
+                    {gymsDetails.map((gym, idx) => {
+                      let displayName = gym.name || "Unknown";
+                      if (!displayName.trim().toLowerCase().endsWith("gym")) {
+                        displayName = displayName + " gym";
+                      }
+                      const isActive = localActiveGym === gym.id;
+                      return (
+                        <View
+                          key={gym.id}
+                          style={{
+                            position: "relative",
+                            marginBottom: idx === gymsDetails.length - 1 ? 0 : 12,
+                          }}
+                        >
+                          <View style={[
+                            modalStyles.gymItem,
+                            isActive && { borderColor: colors.bg.primary, borderWidth: 2 },
+                            { alignItems: "center" }
+                          ]}>
+                            <TouchableOpacity
+                              style={[modalStyles.gymInfoContainer, { flex: 1, minWidth: 0 }]}
+                              onPress={() => handleSelectGym(gym.id)}
+                              activeOpacity={0.7}
+                            >
+                              <View style={modalStyles.gymNameRow}>
+                                <Text
+                                  style={modalStyles.gymName}
+                                  numberOfLines={1}
+                                  ellipsizeMode="tail"
+                                >
+                                  {displayName}
+                                </Text>
+                                <Text style={modalStyles.gymId}>ID: {gym.id}</Text>
+                              </View>
+                              <Text style={modalStyles.gymLocation}>{gym.location}</Text>
+                              <Text style={modalStyles.gymEquipment}>
+                                Equipment: {gym.equipmentCount}
+                              </Text>
+                            </TouchableOpacity>
+                            {/* Right section: Ellipsis button */}
+                            <TouchableOpacity
+                              style={modalStyles.ellipsisButton}
+                              onPress={() => openGymMenu(gym.id)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                              <FontAwesome5 name="ellipsis-v" size={18} color={colors.text.white} />
+                            </TouchableOpacity>
+                          </View>
+                          {/* Ellipsis menu */}
+                          {menuGymId === gym.id && (
+                            <View style={modalStyles.ellipsisMenu}>
+                              <TouchableOpacity
+                                onPress={() => {
+                                  closeGymMenu();
+                                  setGymModalVisible(false);
+                                  navigation.navigate("NewGym", { gym_id: gym.id });
+                                }}
+                                style={modalStyles.ellipsisMenuItem}
+                              >
+                                <FontAwesome5 name="edit" size={16} color={colors.text.primary} />
+                                <Text style={modalStyles.ellipsisMenuText}>Edit</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                onPress={() => deleteGym(gym.id)}
+                                style={modalStyles.ellipsisMenuItem}
+                              >
+                                <FontAwesome5 name="trash" size={16} color={colors.text.danger} />
+                                <Text style={modalStyles.ellipsisMenuDeleteText}>Delete</Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </ScrollView>
+                )}
+              </View>
+              <TouchableOpacity
+                style={modalStyles.addButton}
+                onPress={() => {
+                  setGymModalVisible(false);
+                  navigation.navigate("NewGym");
+                }}
+              >
+                <Text style={modalStyles.addButtonText}>Add new gym</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={modalStyles.closeButton}
+                onPress={() => setGymModalVisible(false)}
+              >
+                <FontAwesome5 name="times" size={22} color={colors.text.white} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Trigger for modal */}
+        <TouchableOpacity
+          onPress={handleOpenGymModal}
+          style={{
+            marginTop: 24,
+            backgroundColor: colors.bg.primary,
+            padding: 12,
+            borderRadius: 8,
+            alignSelf: "center",
+          }}
+        >
+          <Text style={{ color: colors.text.white, fontWeight: "bold" }}>Open Gym Modal</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );

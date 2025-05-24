@@ -15,22 +15,6 @@ export default function FitnessPlanScreen({ navigation }) {
   const { colors } = useThemeContext();
   const { user } = useContext(UserContext);
 
-  // Parse JSON fields only if they exist
-  const units = useMemo(
-    () =>
-      user?.settings?.units
-        ? JSON.parse(user.settings.units)
-        : { weight: "kg", height: "cm" },
-    [user?.settings?.units]
-  );
-  const performanceData = useMemo(
-    () =>
-      user?.settings?.performance_data
-        ? JSON.parse(user.settings.performance_data)
-        : {},
-    [user?.settings?.performance_data]
-  );
-
   const styles = StyleSheet.create({
     container: {
       flex: 1,
@@ -115,6 +99,7 @@ export default function FitnessPlanScreen({ navigation }) {
         title: user.settings.fitness_goal || "No goal",
         subtitle: "Fitness goal",
         style: "secondary",
+        onPress: "FitnessGoal",
       },
       {
         title: user.settings.weekly_goal
@@ -122,26 +107,31 @@ export default function FitnessPlanScreen({ navigation }) {
           : "No weekly goal",
         subtitle: "Weekly goal",
         style: "secondary",
+        onPress: "WeeklyGoal",
       },
     ],
     [
       {
-        title: performanceData.activity_level || "No data",
+        title: user.settings.performance_data.activity_level || "No data",
         subtitle: "Fitness experience",
         style: "secondary",
+        onPress: "FitnessExperience",
       },
       {
-        title: user.settings.training_preferences || "No preferences",
-        subtitle: "Training preferences",
+        title: user.settings.workout_duration
+          ? `${user.settings.workout_duration} minutes`
+          : "No duration set",
+        subtitle: "Workout duration",
         style: "secondary",
-      },
+        onPress: "WorkoutDuration",
+      },      
     ],
     [
       {
-        title: `${units.weight || "kg"}, ${units.height || "cm"}`,
-        subtitle: "Preferred units",
+        title: "Advanced",
         style: "secondary",
-      },
+        onPress: "AdvancedSettings",
+      }
     ],
   ];
 

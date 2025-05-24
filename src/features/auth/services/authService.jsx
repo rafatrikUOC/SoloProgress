@@ -31,7 +31,7 @@ export const registerUser = async (data) => {
         gender: gender,
       },
     ])
-    .select();
+      .select();
 
     //Extract id
 
@@ -46,15 +46,37 @@ export const registerUser = async (data) => {
         units: JSON.stringify({
           weight: weightUnit,
           height: heightUnit,
-        }), // Store units preferences
-        app_preferences: null, // You can customize this later
+        }),
+        app_preferences: JSON.stringify({
+          "workout_duration": 60,
+          "dropsets": true,
+          "rest_time": {
+            "enabled": true,
+            "compound": 150,
+            "isolation": 90
+          },
+          "supersets": true,
+          "warmup_sets": {
+            "enabled": true,
+            "compound": 2,
+            "isolation": 1
+          },
+          "plate_calculator": true,
+          "reps_progression": {
+            "compound": [
+              "Straight"
+            ],
+            "isolation": [
+              "Straight"
+            ]
+          }
+        }),
         fitness_goal: goal,
-        weekly_goal: null, // You can customize this later if necessary
         performance_data: JSON.stringify({
           activity_level: activityLevel,
-        }), // Store activity level in performance_data
-        weekly_goal: 6, //Default one
-        selected_routine: 1, //Default one
+        }),
+        weekly_goal: 4,
+        selected_routine: 1,
       },
     ]);
 
@@ -160,7 +182,9 @@ export const loginUser = async (email, password) => {
     if (splitError) throw new Error(splitError.message);
     split = splitData;
   }
-
+  console.log(user);
+  console.log(settings);
+  console.log(split);
   // 4. Return all user data
   return { info: user, settings, split };
 };

@@ -52,10 +52,13 @@ CREATE TABLE "ClientTags" (
 COMMENT ON TABLE "ClientTags" IS 'Many-to-many relationship between clients and tags, allowing clients to have multiple tags.';
 
 CREATE TABLE "Gyms" (
-	id SERIAL PRIMARY KEY, 
-	name TEXT, -- Name of the gym
-	location TEXT, -- Location of the gym (e.g., address or city)
-	equipment JSONB DEFAULT NULL -- Equipment available in the gym, stored in JSONB format for flexibility 
+  id SERIAL PRIMARY KEY, 
+  name TEXT, -- Name of the gym
+  location TEXT, -- Location of the gym (e.g., address or city)
+  equipment JSONB DEFAULT NULL, -- Equipment available in the gym, stored in JSONB format for flexibility 
+  type TEXT CHECK (type IN ('Large gym', 'Small gym', 'Garage gym')) DEFAULT 'Large gym', -- Specifies the type of gym
+  private BOOLEAN DEFAULT TRUE, -- Indicates if the gym is private (TRUE) or public (FALSE)
+  created_by INTEGER REFERENCES "Users"(id) ON DELETE SET NULL, -- User who created this gym (nullified if user is deleted)
 );
 COMMENT ON TABLE "Gyms" IS 'Gyms where users can train, including equipment and location details.';
 

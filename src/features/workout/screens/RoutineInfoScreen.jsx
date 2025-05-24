@@ -15,7 +15,7 @@ import { UserContext } from "../../../global/contexts/UserContext";
 
 export default function RoutineInfoScreen({ navigation, route }) {
   const { colors, typography } = useThemeContext();
-  const split_id = route.params?.split_id ?? 1; // Default to 1 if not provided
+  const split_id = route.params?.split_id;
   const [split, setSplit] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -35,7 +35,6 @@ export default function RoutineInfoScreen({ navigation, route }) {
       setLoading(false);
     };
     if (split_id) fetchSplit();
-    console.log(split);
   }, [split_id]);
 
   const styles = StyleSheet.create({
@@ -52,7 +51,7 @@ export default function RoutineInfoScreen({ navigation, route }) {
     },
     cardTitle: {
       color: colors.text.white,
-      ...typography.primaryMd,
+      ...typography.primaryBase,
       fontWeight: "bold",
       marginBottom: 6,
       textAlign: "left",

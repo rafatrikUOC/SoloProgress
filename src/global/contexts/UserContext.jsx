@@ -5,9 +5,9 @@ export const UserContext = createContext();
 
 export const UserProvider = ({ children }) => {
   const [user, setUser] = useState({
-    info: null,     // Datos de la tabla Users
-    settings: null, // Datos de la tabla UserSettings
-    split: null,    // Rutina seleccionada (TrainingSplits)
+    info: null,     // Users table data
+    settings: null, // UserSettings table data
+    split: null,    // TrainingSplits table data (from User)
   });
   const [loading, setLoading] = useState({
     info: false,
@@ -22,6 +22,7 @@ export const UserProvider = ({ children }) => {
 
   // Fetch user info from Users table
   const fetchUserInfo = async (authUser) => {
+    console.log("Fetching user info");
     if (!authUser?.email) {
       setUser(u => ({ ...u, info: null }));
       return;
@@ -46,6 +47,7 @@ export const UserProvider = ({ children }) => {
 
   // Fetch user settings
   const fetchUserSettings = async (userId) => {
+    console.log("Fetching user settings");
     setLoading(l => ({ ...l, settings: true }));
     setError(e => ({ ...e, settings: null }));
     try {
@@ -66,6 +68,7 @@ export const UserProvider = ({ children }) => {
 
   // Fetch selected split/routine
   const fetchUserSplit = async (splitId) => {
+    console.log("Fetching user split");
     if (!splitId) {
       setUser(u => ({ ...u, split: null }));
       return;
@@ -138,9 +141,11 @@ export const UserProvider = ({ children }) => {
       setUser,
       loading,
       error,
-      refetchUserInfo: () => user.info?.email && fetchUserInfo({ email: user.info.email }),
-      refetchUserSettings: () => user.info?.id && fetchUserSettings(user.info.id),
-      refetchUserSplit: () => user.settings?.selected_routine && fetchUserSplit(user.settings.selected_routine),
+      refreshUser: async () => {
+        if (user.info?.email) await fetchUserInfo({ email: user.info.email });
+        if (user.info?.id) await fetchUserSettings(user.info.id);
+        if (user.settings?.selected_routine) await fetchUserSplit(user.settings.selected_routine);
+      },
     }}>
       {children}
     </UserContext.Provider>

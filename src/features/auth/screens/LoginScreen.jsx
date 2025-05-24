@@ -5,6 +5,8 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  Platform,
+  KeyboardAvoidingView
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useThemeContext } from "../../../global/contexts/ThemeContext";
@@ -34,7 +36,7 @@ export default function LoginScreen({ navigation, route }) {
       setError(err.message || "Login failed");
     }
   };
-  
+
 
   const styles = StyleSheet.create({
     container: {
@@ -132,7 +134,10 @@ export default function LoginScreen({ navigation, route }) {
   });
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
       {/* Show success toast after registration */}
       {route.params?.registrationSuccess && (
         <ToastMessage
@@ -209,6 +214,6 @@ export default function LoginScreen({ navigation, route }) {
           <Text style={styles.registerLink}>Sign up</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
