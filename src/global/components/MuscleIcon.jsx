@@ -1,6 +1,6 @@
 import React from "react";
 
-// Importa todos los SVGs que usarás
+// Import all muscle SVG components
 import Abs from "../../../assets/muscles/Abs.svg";
 import Back from "../../../assets/muscles/Back.svg";
 import Biceps from "../../../assets/muscles/Biceps.svg";
@@ -16,8 +16,31 @@ import Shoulders from "../../../assets/muscles/Shoulders.svg";
 import Thighs from "../../../assets/muscles/Thighs.svg";
 import Triceps from "../../../assets/muscles/Triceps.svg";
 
-// Mapea los nombres a los componentes SVG
-const muscleMap = {
+// Aliases for alternative muscle names
+const muscleAliases = {
+  Quads: "Quadriceps",
+  Quad: "Quadriceps",
+  Glutes: "Hips",
+  Glute: "Hips",
+  Abdominals: "Abs",
+  Abdominal: "Abs",
+  Pecs: "Chest",
+  Pec: "Chest",
+  Delts: "Shoulders",
+  Delt: "Shoulders",
+  Traps: "Back",
+  Trap: "Back",
+  Lats: "Back",
+  Lat: "Back",
+  Bicep: "Biceps",
+  Tricep: "Triceps",
+  Calf: "Calves",
+  Hamstring: "Hamstrings",
+  Thigh: "Thighs",
+};
+
+// Canonical muscle name to component map
+const muscleComponents = {
   Abs,
   Back,
   Biceps,
@@ -35,16 +58,16 @@ const muscleMap = {
 };
 
 export default function MuscleIcon({ muscle, size = 40, ...props }) {
-  // Normaliza el nombre para que coincida con las keys del objeto
-  const key =
+  if (!muscle) return null;
+
+  // Capitalize first letter to match keys
+  const normalized =
     muscle.charAt(0).toUpperCase() + muscle.slice(1).toLowerCase();
 
-  const MuscleSvg = muscleMap[key];
+  const canonicalName = muscleAliases[normalized] || normalized;
+  const MuscleSvg = muscleComponents[canonicalName];
 
-  if (!MuscleSvg) {
-    // Puedes mostrar un icono por defecto si no existe
-    return null;
-  }
+  if (!MuscleSvg) return null;
 
   return <MuscleSvg width={size} height={size} {...props} />;
 }

@@ -4,7 +4,6 @@ import { FontAwesome, Feather } from "@expo/vector-icons";
 import { useThemeContext } from "../../../global/contexts/ThemeContext";
 import { BackButton, ActionButton, HeaderBlock } from "../../../global/components/UIElements";
 import { useRegisterUser } from "../hooks/useRegisterUser";
-import { SkipButton } from "../../../global/components/UIElements";
 
 export default function Register10({ navigation }) {
   const { colors, typography } = useThemeContext();
@@ -115,7 +114,6 @@ export default function Register10({ navigation }) {
   return (
     <View style={styles.container}>
       <BackButton onPress={() => navigation.goBack()} />
-        <SkipButton onPress={() => navigation.navigate("Login", { registrationSuccess: true })} />
 
       <HeaderBlock
         title="Create a password"

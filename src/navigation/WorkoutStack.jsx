@@ -13,6 +13,7 @@ import FitnessExperienceScreen from "../features/workout/screens/FitnessExperien
 import WorkoutDurationScreen from "../features/workout/screens/WorkoutDurationScreen";
 import AdvancedSettingsScreen from "../features/workout/screens/AdvancedSettingsScreen";
 import NewGymScreen from "../features/workout/screens/NewGymScreen";
+import RoutineLibraryScreen from "../features/workout/screens/RoutineLibraryScreen";
 
 // Other features screens
 import ExerciseScreen from "../features/exercises/screens/ExerciseScreen";
@@ -32,6 +33,7 @@ export default function WorkoutStack() {
       <Stack.Screen name="FitnessPlan" component={FitnessPlanScreen} />
       <Stack.Screen name="MyRoutines" component={MyRoutinesScreen} />
       <Stack.Screen name="RoutineInfo" component={RoutineInfoScreen} />
+	  <Stack.Screen name="RoutineLibrary" component={RoutineLibraryScreen} />
       <Stack.Screen name="FitnessGoal" component={FitnessGoalScreen} />
       <Stack.Screen name="WeeklyGoal" component={WeeklyGoalScreen} />
       <Stack.Screen name="FitnessExperience" component={FitnessExperienceScreen} />
