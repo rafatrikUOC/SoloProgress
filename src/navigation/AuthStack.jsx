@@ -12,13 +12,13 @@ import Register7 from "../features/auth/screens/Register7Screen";
 import Register8 from "../features/auth/screens/Register8Screen";
 import Register9 from "../features/auth/screens/Register9Screen";
 import Register10 from "../features/auth/screens/Register10Screen";
-
+import ChangePassword from "../features/auth/screens/ChangePasswordScreen";
 
 const Stack = createStackNavigator();
 
-export default function AuthStack() {
+export default function AuthStack({ initialRouteName = "Login" }) {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={initialRouteName}>
       {/* Login screen */}
       <Stack.Screen name="Login" component={Login} />
 
@@ -36,6 +36,7 @@ export default function AuthStack() {
 
       {/* Forgot Password screen */}
       <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
+      <Stack.Screen name="ChangePassword" component={ChangePassword} />
     </Stack.Navigator>
   );
 }

@@ -32,7 +32,7 @@ export default function WorkoutStack() {
       <Stack.Screen name="FitnessPlan" component={FitnessPlanScreen} />
       <Stack.Screen name="MyRoutines" component={MyRoutinesScreen} />
       <Stack.Screen name="RoutineInfo" component={RoutineInfoScreen} />
-	  <Stack.Screen name="RoutineLibrary" component={RoutineLibraryScreen} />
+	    <Stack.Screen name="RoutineLibrary" component={RoutineLibraryScreen} />
       <Stack.Screen name="FitnessGoal" component={FitnessGoalScreen} />
       <Stack.Screen name="WeeklyGoal" component={WeeklyGoalScreen} />
       <Stack.Screen name="FitnessExperience" component={FitnessExperienceScreen} />

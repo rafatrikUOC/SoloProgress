@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   View,
   TextInput,
@@ -14,6 +14,7 @@ import { FontAwesome, Feather } from "@expo/vector-icons";
 import { useThemeContext } from "../../../global/contexts/ThemeContext";
 import { supabase } from "../../../global/services/supabaseService";
 import { clearData } from "../../../global/utils/storage";
+import { UserContext } from "../../../global/contexts/UserContext";
 import { ActionButton, HeaderBlock } from "../../../global/components/UIElements";
 
 export default function ChangePasswordScreen({ navigation }) {
@@ -27,6 +28,7 @@ export default function ChangePasswordScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [info, setInfo] = useState("");
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const { setUser } = useContext(UserContext);
 
   useEffect(() => {
     const keyboardShowListener = Keyboard.addListener("keyboardDidShow", () => {
@@ -77,11 +79,7 @@ export default function ChangePasswordScreen({ navigation }) {
     try {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
-      setInfo("Password changed successfully!");
       await clearData("mustChangePassword");
-      setTimeout(() => {
-        navigation.replace("Home");
-      }, 1200);
     } catch (err) {
       setError(err.message || "Could not change password.");
     } finally {

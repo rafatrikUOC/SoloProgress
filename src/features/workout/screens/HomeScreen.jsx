@@ -14,7 +14,7 @@ import {
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useThemeContext } from "../../../global/contexts/ThemeContext";
 import { UserContext } from "../../../global/contexts/UserContext";
-import { getData, clearData } from "../../../global/utils/storage";
+import { getData } from "../../../global/utils/storage";
 import { supabase } from "../../../global/services/supabaseService";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;

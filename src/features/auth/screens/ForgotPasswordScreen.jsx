@@ -62,6 +62,7 @@ export default function ForgotPasswordScreen({ navigation }) {
       setInfo("Token verified! Redirecting to change password...");
       // Aquí RootNavigator/HomeScreen debería redirigir
     } catch (err) {
+      setInfo("");
       setError(err.message || "Could not verify token.");
     } finally {
       setLoading(false);
