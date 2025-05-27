@@ -24,7 +24,8 @@ export default function RoutineInfoScreen({ navigation, route }) {
 	const [loading, setLoading] = useState(true);
 	const [isUpdating, setIsUpdating] = useState(false);
 	const [isUpdated, setIsUpdated] = useState(false);
-	const { user, refetchUserSettings, refetchUserSplit } = useContext(UserContext);
+	const [locallySelected, setLocallySelected] = useState(false);
+	const { user, refreshUser } = useContext(UserContext);
 
 	const isSelected = user?.split?.id === split?.id;
 
@@ -32,6 +33,7 @@ export default function RoutineInfoScreen({ navigation, route }) {
 		if (!user?.info?.id || !split?.id || isSelected || isUpdating || isUpdated) return;
 
 		setIsUpdating(true);
+		setLocallySelected(true);
 		try {
 			// 1. Update in supabase
 			const { error } = await supabase
@@ -42,16 +44,13 @@ export default function RoutineInfoScreen({ navigation, route }) {
 			if (error) throw error;
 
 			// 2. Refresh user data
-			await refetchUserSettings();
-			await refetchUserSplit();
+			refreshUser();
 
 			// 3. Show feedback
 			setIsUpdated(true);
 		} catch (error) {
+			setLocallySelected(false);
 			console.error('Error selecting routine:', error);
-			alert('Failed to select routine');
-		} finally {
-			setIsUpdating(false);
 		}
 	};
 
@@ -67,7 +66,6 @@ export default function RoutineInfoScreen({ navigation, route }) {
 			setLoading(false);
 		};
 		if (split_id) fetchSplit();
-		console.log(split);
 	}, [split_id]);
 
 	const styles = StyleSheet.create({

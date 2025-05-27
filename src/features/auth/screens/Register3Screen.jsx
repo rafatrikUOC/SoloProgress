@@ -10,7 +10,7 @@ import {
 import { useThemeContext } from "../../../global/contexts/ThemeContext";
 import { BackButton, ActionButton, HeaderBlock } from "../../../global/components/UIElements";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { saveData, getData } from "../../../global/utils/storage"; // Import storage utility
+import { saveData, getData } from "../../../global/utils/storage";
 
 const { width } = Dimensions.get("window");
 const MIN_AGE = 13;
@@ -86,11 +86,7 @@ export default function Register3({ navigation }) {
       saveAgeData(age);
     }
   }, [age]); // Save age data when the `age` value changes
-
-  const data = {
-    age,
-  };
-
+  
   const getItemLayout = (_, index) => ({
     length: ITEM_WIDTH,
     offset: ITEM_WIDTH * index,

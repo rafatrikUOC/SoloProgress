@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Platform,
+  Keyboard,
   KeyboardAvoidingView
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
@@ -22,6 +23,20 @@ export default function LoginScreen({ navigation, route }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const keyboardShowListener = Keyboard.addListener("keyboardDidShow", () => {
+      setIsKeyboardVisible(true);
+    });
+    const keyboardHideListener = Keyboard.addListener("keyboardDidHide", () => {
+      setIsKeyboardVisible(false);
+    });
+    return () => {
+      keyboardShowListener.remove();
+      keyboardHideListener.remove();
+    };
+  }, []);
 
   const handleLogin = async () => {
     try {
@@ -36,7 +51,6 @@ export default function LoginScreen({ navigation, route }) {
       setError(err.message || "Login failed");
     }
   };
-
 
   const styles = StyleSheet.create({
     container: {
@@ -135,13 +149,14 @@ export default function LoginScreen({ navigation, route }) {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      enabled={isKeyboardVisible}
       style={styles.container}
     >
       {/* Show success toast after registration */}
       {route.params?.registrationSuccess && (
         <ToastMessage
-          message={"Account created successfully"}
+          message={"Account created successfully. Please check your email to confirm your account."}
           type={"success"}
         />
       )}

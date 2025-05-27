@@ -22,7 +22,6 @@ export const UserProvider = ({ children }) => {
 
   // Fetch user info from Users table
   const fetchUserInfo = async (authUser) => {
-    console.log("Fetching user info");
     if (!authUser?.email) {
       setUser(u => ({ ...u, info: null }));
       return;
@@ -30,13 +29,27 @@ export const UserProvider = ({ children }) => {
     setLoading(l => ({ ...l, info: true }));
     setError(e => ({ ...e, info: null }));
     try {
+      // Fetch from Users table
       const { data, error } = await supabase
         .from("Users")
         .select("*")
         .eq("email", authUser.email)
         .single();
       if (error) throw error;
-      setUser(u => ({ ...u, info: data }));
+
+      // Get the current session user to check email confirmation
+      let emailConfirmed = false;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const sessionUser = sessionData?.session?.user;
+      // Only check confirmation for the logged-in user
+      if (sessionUser && sessionUser.email === authUser.email) {
+        emailConfirmed = !!sessionUser.email_confirmed_at;
+      }
+
+      setUser(u => ({
+        ...u,
+        info: { ...data, emailConfirmed }
+      }));
     } catch (err) {
       setUser(u => ({ ...u, info: null }));
       setError(e => ({ ...e, info: err.message || "Error fetching user info" }));
@@ -47,7 +60,6 @@ export const UserProvider = ({ children }) => {
 
   // Fetch user settings
   const fetchUserSettings = async (userId) => {
-    console.log("Fetching user settings");
     setLoading(l => ({ ...l, settings: true }));
     setError(e => ({ ...e, settings: null }));
     try {
@@ -68,7 +80,6 @@ export const UserProvider = ({ children }) => {
 
   // Fetch selected split/routine
   const fetchUserSplit = async (splitId) => {
-    console.log("Fetching user split");
     if (!splitId) {
       setUser(u => ({ ...u, split: null }));
       return;

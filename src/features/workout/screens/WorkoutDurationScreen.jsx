@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import Slider from "@react-native-community/slider";
 import { useThemeContext } from "../../../global/contexts/ThemeContext";
@@ -16,12 +17,16 @@ const MAX_DURATION = 120;
 const STEP = 5;
 
 export default function WorkoutDurationScreen({ navigation }) {
-  const { colors, typography } = useThemeContext();
+  const { colors } = useThemeContext();
   const { user, refreshUser, setUser } = useContext(UserContext);
-  const [duration, setDuration] = useState(MIN_DURATION);
 
-  // Obtener el valor inicial desde app_preferences
+  // Duration state is undefined until loaded from user preferences
+  const [duration, setDuration] = useState(undefined);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load initial value from user settings
   useEffect(() => {
+    setIsLoading(true);
     const appPrefs = user?.settings?.app_preferences;
     let prefs = appPrefs;
     if (typeof appPrefs === "string") {
@@ -31,27 +36,31 @@ export default function WorkoutDurationScreen({ navigation }) {
         prefs = {};
       }
     }
-    if (prefs && prefs.workout_duration) {
+    if (prefs && typeof prefs.workout_duration === "number") {
       setDuration(prefs.workout_duration);
+    } else {
+      setDuration(MIN_DURATION);
     }
+    setIsLoading(false);
   }, [user]);
 
+  // Handle slider value change (not persisted yet)
   const handleValueChange = (value) => {
     setDuration(value);
   };
 
-  // Actualización optimista en app_preferences
+  // Optimistic update and save to Supabase
   const handleSlidingComplete = async (value) => {
     setDuration(value);
 
-    // Obtener las preferencias actuales
+    // Get current preferences
     const prevAppPrefs = user?.settings?.app_preferences
       ? (typeof user.settings.app_preferences === "string"
           ? JSON.parse(user.settings.app_preferences)
           : user.settings.app_preferences)
       : {};
 
-    // Actualizar localmente en el contexto
+    // Optimistically update user context
     setUser((prevUser) => ({
       ...prevUser,
       settings: {
@@ -63,7 +72,7 @@ export default function WorkoutDurationScreen({ navigation }) {
       },
     }));
 
-    // Guardar en Supabase
+    // Save to Supabase
     try {
       await supabase
         .from("UserSettings")
@@ -76,7 +85,7 @@ export default function WorkoutDurationScreen({ navigation }) {
         .eq("user_id", user.info.id);
       refreshUser();
     } catch (error) {
-      // Si falla, revertir el cambio local
+      // Revert local change if update fails
       setUser((prevUser) => ({
         ...prevUser,
         settings: {
@@ -134,27 +143,34 @@ export default function WorkoutDurationScreen({ navigation }) {
       <ScrollView showsVerticalScrollIndicator={false}>
         <ScreenTitle title="Workout duration" />
         <View style={styles.sliderContainer}>
-          <Text style={styles.durationValue}>{duration} min</Text>
-          <Text style={styles.durationLabel}>Select your preferred workout duration</Text>
-          <Slider
-            style={{ width: "100%", height: 40 }}
-            minimumValue={MIN_DURATION}
-            maximumValue={MAX_DURATION}
-            step={STEP}
-            value={duration}
-            minimumTrackTintColor={colors.bg.primary}
-            maximumTrackTintColor={colors.bg.secondary}
-            thumbTintColor={colors.bg.primary}
-            onValueChange={handleValueChange}
-            onSlidingComplete={handleSlidingComplete}
-          />
-          <View style={styles.marksRow}>
-            {marks.map((mark) => (
-              <Text key={mark} style={styles.mark}>
-                {mark}
-              </Text>
-            ))}
-          </View>
+          {/* Show loader while duration is loading */}
+          {isLoading || typeof duration !== "number" ? (
+            <ActivityIndicator size="large" color={colors.bg.primary} />
+          ) : (
+            <>
+              <Text style={styles.durationValue}>{duration} min</Text>
+              <Text style={styles.durationLabel}>Select your preferred workout duration</Text>
+              <Slider
+                style={{ width: "100%", height: 40 }}
+                minimumValue={MIN_DURATION}
+                maximumValue={MAX_DURATION}
+                step={STEP}
+                value={duration}
+                minimumTrackTintColor={colors.bg.primary}
+                maximumTrackTintColor={colors.bg.secondary}
+                thumbTintColor={colors.bg.primary}
+                onValueChange={handleValueChange}
+                onSlidingComplete={handleSlidingComplete}
+              />
+              <View style={styles.marksRow}>
+                {marks.map((mark) => (
+                  <Text key={mark} style={styles.mark}>
+                    {mark}
+                  </Text>
+                ))}
+              </View>
+            </>
+          )}
         </View>
       </ScrollView>
     </View>

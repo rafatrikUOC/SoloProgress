@@ -3,19 +3,32 @@
 -- ====================
 
 CREATE TABLE "Users" (
-	id SERIAL PRIMARY KEY,
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
 	username TEXT UNIQUE,
 	email TEXT UNIQUE,
-	password_hash TEXT,
 	photo_url TEXT DEFAULT '',
 	is_trainer BOOLEAN DEFAULT FALSE,
 	gender TEXT DEFAULT NULL
 );
 COMMENT ON TABLE "Users" IS 'Main users table, including both trainers and clients.';
 
+CREATE TABLE "TrainingSplits" (
+    id SERIAL PRIMARY KEY,
+    title TEXT NOT NULL,              -- Split title, e.g., "PUSH, PULL, LEGS"
+    duration TEXT NOT NULL,           -- Typical session duration, e.g., "45' - 60'"
+    days_per_week TEXT NOT NULL,      -- Days per week, e.g., "3/6"
+    sessions INT NOT NULL,            -- Number of sessions in the split, e.g., 3
+    level JSONB NOT NULL,             -- Levels for which the split is suitable, e.g., ["Beginner", "Intermediate", "Advanced"]
+    workouts JSONB NOT NULL,          -- Workouts structure for the split
+    description TEXT NOT NULL,        -- Description of the split
+    is_custom BOOLEAN NOT NULL DEFAULT FALSE, -- Indicates if the split is custom
+    created_by UUID REFERENCES "Users"(id) -- User ID of the creator (nullable, only set if is_custom is true)
+);
+COMMENT ON TABLE "TrainingSplits" IS 'Stores available and custom training splits, including metadata, workouts, and creator info if custom.';
+
 CREATE TABLE "UserSettings" (
 	id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES "Users"(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES "Users"(id) ON DELETE CASCADE,
   units JSONB DEFAULT NULL,                -- User units preferences (metric or imperial), default to NULL
   app_preferences JSONB DEFAULT NULL,      -- User-specific preferences for the app, default to NULL
   fitness_goal TEXT DEFAULT NULL,          -- Fitness goal (e.g., strength, weight loss), default to NULL
@@ -28,7 +41,7 @@ COMMENT ON TABLE "UserSettings" IS 'User-specific configuration settings (units,
 
 CREATE TABLE "Measurements" (
 	id SERIAL PRIMARY KEY,
-	user_id INTEGER NOT NULL REFERENCES "Users"(id) ON DELETE CASCADE,
+	user_id UUID NOT NULL REFERENCES "Users"(id) ON DELETE CASCADE,
 	date DATE NOT NULL,
 	key TEXT NOT NULL, -- Measurement key (e.g., weight, body fat percentage, etc.)
 	value FLOAT NOT NULL -- Measurement value (e.g., 70.5 for weight in kg)
@@ -37,7 +50,7 @@ COMMENT ON TABLE "Measurements" IS 'User physical measurements (e.g., weight, bo
 
 CREATE TABLE "Tags" (
 	id SERIAL PRIMARY KEY,
-	user_id INTEGER NOT NULL REFERENCES "Users"(id) ON DELETE CASCADE, -- Trainer who created the tag
+	user_id UUID NOT NULL REFERENCES "Users"(id) ON DELETE CASCADE, -- Trainer who created the tag
 	name TEXT NOT NULL, -- Name of the tag (e.g., "Beginner", "Advanced", etc.)
 	color TEXT, -- Color associated with the tag (e.g., "#FF5733")
 	description TEXT -- Description of the tag (e.g., "Clients who are beginners in strength training")
@@ -45,7 +58,7 @@ CREATE TABLE "Tags" (
 COMMENT ON TABLE "Tags" IS 'Tags created by trainers to categorize clients or routines.';
 
 CREATE TABLE "ClientTags" (
-	client_id INTEGER NOT NULL REFERENCES "Users"(id) ON DELETE CASCADE, -- Client who is assigned the tag
+	client_id UUID NOT NULL REFERENCES "Users"(id) ON DELETE CASCADE, -- Client who is assigned the tag
 	tag_id INTEGER NOT NULL REFERENCES "Tags"(id) ON DELETE CASCADE, -- Tag assigned to the client
 	PRIMARY KEY (client_id, tag_id) 
 );
@@ -58,30 +71,16 @@ CREATE TABLE "Gyms" (
   equipment JSONB DEFAULT NULL, -- Equipment available in the gym, stored in JSONB format for flexibility 
   type TEXT CHECK (type IN ('Large gym', 'Small gym', 'Garage gym')) DEFAULT 'Large gym', -- Specifies the type of gym
   private BOOLEAN DEFAULT TRUE, -- Indicates if the gym is private (TRUE) or public (FALSE)
-  created_by INTEGER REFERENCES "Users"(id) ON DELETE SET NULL, -- User who created this gym (nullified if user is deleted)
+  created_by UUID REFERENCES "Users"(id) ON DELETE SET NULL -- User who created this gym (nullified if user is deleted)
 );
 COMMENT ON TABLE "Gyms" IS 'Gyms where users can train, including equipment and location details.';
-
-CREATE TABLE "TrainingSplits" (
-    id SERIAL PRIMARY KEY,
-    title TEXT NOT NULL,              -- Split title, e.g., "PUSH, PULL, LEGS"
-    duration TEXT NOT NULL,           -- Typical session duration, e.g., "45' - 60'"
-    days_per_week TEXT NOT NULL,      -- Days per week, e.g., "3/6"
-    sessions INT NOT NULL,            -- Number of sessions in the split, e.g., 3
-    level JSONB NOT NULL,             -- Levels for which the split is suitable, e.g., ["Beginner", "Intermediate", "Advanced"]
-    workouts JSONB NOT NULL,          -- Workouts structure for the split
-    description TEXT NOT NULL,        -- Description of the split
-    is_custom BOOLEAN NOT NULL DEFAULT FALSE, -- Indicates if the split is custom
-    created_by INTEGER REFERENCES "Users"(id) -- User ID of the creator (nullable, only set if is_custom is true)
-);
-COMMENT ON TABLE "TrainingSplits" IS 'Stores available and custom training splits, including metadata, workouts, and creator info if custom.';
 
 CREATE TABLE "Routines" (
 	id SERIAL PRIMARY KEY, 
 	title TEXT, -- Title of the routine
 	description TEXT, -- Description of the routine
 	type TEXT, -- Type of routine (e.g., "structured", "punctual")
-	created_by INTEGER NOT NULL REFERENCES "Users"(id) ON DELETE CASCADE -- User who created the routine 
+	created_by UUID NOT NULL REFERENCES "Users"(id) ON DELETE CASCADE -- User who created the routine 
 );
 COMMENT ON TABLE "Routines" IS 'Main routines table, including both punctual and structured routines.';
 
@@ -149,7 +148,7 @@ COMMENT ON TABLE "RoutineSteps" IS 'Steps within a routine, including exercises,
 
 CREATE TABLE "TrainingSessions" (
 	id SERIAL PRIMARY KEY,
-	user_id INTEGER NOT NULL REFERENCES "Users"(id) ON DELETE CASCADE,
+	user_id UUID NOT NULL REFERENCES "Users"(id) ON DELETE CASCADE,
 	routine_id INTEGER NOT NULL REFERENCES "Routines"(id) ON DELETE CASCADE,
 	punctual_id INTEGER REFERENCES "PuntualRoutines"(id) ON DELETE SET NULL,
 	session_id INTEGER REFERENCES "RoutineSessions"(id) ON DELETE SET NULL,
@@ -193,7 +192,7 @@ COMMENT ON TABLE "ExerciseSeries" IS 'Sets (warm-up or working) performed during
 
 CREATE TABLE "Imports" (
 	id SERIAL PRIMARY KEY, 
-	user_id INTEGER NOT NULL REFERENCES "Users"(id) ON DELETE CASCADE, -- User who uploaded the file
+	user_id UUID NOT NULL REFERENCES "Users"(id) ON DELETE CASCADE, -- User who uploaded the file
 	file_name TEXT, -- Name of the uploaded file
 	uploaded_at TIMESTAMP, -- Timestamp when the file was uploaded
 	processed_at TIMESTAMP, -- Timestamp when the file was processed
@@ -244,10 +243,10 @@ CREATE INDEX idx_structuredroutines_level ON "StructuredRoutines" (level);
 
 -- RoutineSessions
 CREATE INDEX idx_routinesessions_structured_id ON "RoutineSessions" (structured_id);
-CREATE INDEX idx_routinesessions_primary_muscles ON "RoutineSessions" (primary_muscles);
+CREATE INDEX idx_routinesessions_primary_muscles ON "RoutineSessions" USING GIN (primary_muscles);
 
 -- Exercises
-CREATE INDEX idx_exercises_primary_muscle ON "Exercises" (primary_muscle);
+CREATE INDEX idx_exercises_primary_muscle ON "Exercises" USING GIN (primary_muscle);
 CREATE INDEX idx_exercises_type ON "Exercises" (type);
 
 -- RoutineSteps
@@ -943,3 +942,17 @@ VALUES
     ]',
     'A simple and effective approach for beginners and intermediates, hitting all major muscle groups each session.'
 );
+
+-- ====================
+-- RESET SEQUENCES
+-- ====================
+TRUNCATE TABLE auth.users RESTART IDENTITY CASCADE;
+TRUNCATE TABLE public."Users" RESTART IDENTITY CASCADE;
+TRUNCATE TABLE public."UserSettings" RESTART IDENTITY CASCADE;
+TRUNCATE TABLE public."Measurements" RESTART IDENTITY CASCADE;
+
+SELECT setval(pg_get_serial_sequence('public."Users"', 'id'), COALESCE(MAX(id)+1, 1), false)  FROM public."Users";
+SELECT setval(pg_get_serial_sequence('public."UserSettings"', 'id'), COALESCE(MAX(id)+1, 1), false)  FROM public."UserSettings";
+SELECT setval(pg_get_serial_sequence('public."Measurements"', 'id'), COALESCE(MAX(id)+1, 1), false)  FROM public."Measurements";
+SELECT setval(pg_get_serial_sequence('public."TrainingSplits"', 'id'), COALESCE(MAX(id)+1, 1), false)  FROM public."TrainingSplits";
+SELECT setval(pg_get_serial_sequence('public."Exercises"', 'id'), COALESCE(MAX(id)+1, 1), false)  FROM public."Exercises";

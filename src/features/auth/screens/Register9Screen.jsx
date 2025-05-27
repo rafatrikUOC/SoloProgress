@@ -1,78 +1,86 @@
 import React, { useState, useEffect } from "react";
-import { View, TextInput, StyleSheet, Text } from "react-native";
+import { View, TextInput, StyleSheet, Text, Platform, KeyboardAvoidingView, Keyboard } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 import { useThemeContext } from "../../../global/contexts/ThemeContext";
 import { BackButton, ActionButton, HeaderBlock } from "../../../global/components/UIElements";
-import { getData, saveData } from "../../../global/utils/storage"; 
-import { checkIfUsernameExists } from "../services/authService";
+import { getData, saveData } from "../../../global/utils/storage";
 
 export default function Register9({ navigation }) {
   const { colors, typography } = useThemeContext();
   const [username, setUsername] = useState("");
   const [isValid, setIsValid] = useState(false);
   const [error, setError] = useState("");
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
-  // Cargar el alias guardado si existe
+  useEffect(() => {
+    const keyboardShowListener = Keyboard.addListener("keyboardDidShow", () => {
+      setIsKeyboardVisible(true);
+    });
+
+    const keyboardHideListener = Keyboard.addListener("keyboardDidHide", () => {
+      setIsKeyboardVisible(false);
+    });
+
+    return () => {
+      keyboardShowListener.remove();
+      keyboardHideListener.remove();
+    };
+  }, []);
+
+  // Load previously stored username if available
   useEffect(() => {
     const loadUsername = async () => {
       const registrationData = await getData("registrationData");
-      if (registrationData?.username) {
-        setUsername(registrationData.username);
-      }
+      if (registrationData?.username) setUsername(registrationData.username);
     };
     loadUsername();
   }, []);
 
+  // Debounced username validation
   useEffect(() => {
     const timeout = setTimeout(() => {
       validateUsername(username.trim());
-    }, 500);
+    }, 400);
     return () => clearTimeout(timeout);
   }, [username]);
 
-  const validateUsername = async (value) => {
+  // Validate username format and availability
+  const validateUsername = (value) => {
+    const usernameRegex = /^[a-zA-Z0-9_]{8,20}$/;
+
     if (!value) {
       setIsValid(false);
       setError("");
-      await deleteUsernameData();
+      deleteUsernameData();
       return;
     }
 
-    if (value.length < 3 || value.length > 20) {
+    if (!usernameRegex.test(value)) {
       setIsValid(false);
-      setError("Username must be 3–20 characters long");
-      await deleteUsernameData();
-      return;
-    }
-
-    // Comprobar disponibilidad del correo
-    const existingUser = await checkIfUsernameExists(value);
-    if (existingUser) {
-      setIsValid(false);
-      setError("Username is already registered");
+      setError("Must be 8–20 characters (letters, numbers or _)");
+      deleteUsernameData();
       return;
     }
 
     setIsValid(true);
     setError("");
-    await saveUsername(value);
+    saveUsername(value);
   };
 
-  const saveUsername = async (username) => {
-    const registrationData = await getData("registrationData") || {};
-    registrationData.username = username;
-    await saveData("registrationData", registrationData);
+  // Save username to registrationData in storage
+  const saveUsername = (username) => {
+    getData("registrationData").then((registrationData = {}) => {
+      registrationData.username = username;
+      saveData("registrationData", registrationData);
+    });
   };
 
-  const deleteUsernameData = async () => {
-    const registrationData = await getData("registrationData") || {};
-    delete registrationData.username;
-    await saveData("registrationData", registrationData);
-  };
-
-  const checkUsernameAvailability = async (value) => {
-    // TODO: Replace with actual API/backend call
-    return true;
+  // Remove username from registrationData in storage
+  const deleteUsernameData = () => {
+    getData("registrationData").then((registrationData = {}) => {
+      delete registrationData.username;
+      saveData("registrationData", registrationData);
+    });
   };
 
   const styles = StyleSheet.create({
@@ -107,24 +115,30 @@ export default function Register9({ navigation }) {
     },
   });
 
+  // Get border color based on validation state
   const getBorderColor = () => {
-    if (error) return colors.text.danger;
-    if (isValid) return colors.text.success;
+    if (error && username) return colors.text.danger;
+    if (isValid && username) return colors.text.success;
     return colors.input.borderColor || colors.input.border || colors.border;
   };
 
+  // Get icon based on validation state
   const getIcon = () => {
-    if (error) {
+    if (error && username) {
       return <FontAwesome name="times-circle" size={20} color={colors.text.danger} style={styles.icon} />;
     }
-    if (isValid) {
+    if (isValid && username) {
       return <FontAwesome name="check-circle" size={20} color={colors.text.success} style={styles.icon} />;
     }
     return null;
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      enabled={isKeyboardVisible}
+      style={styles.container}
+    >
       <BackButton onPress={() => navigation.goBack()} />
 
       <HeaderBlock
@@ -140,7 +154,10 @@ export default function Register9({ navigation }) {
           value={username}
           onChangeText={setUsername}
           maxLength={20}
+          autoCapitalize="none"
           autoComplete="username"
+          textContentType="username"
+          returnKeyType="done"
         />
         {getIcon()}
       </View>
@@ -152,6 +169,6 @@ export default function Register9({ navigation }) {
         disabled={!isValid}
         onPress={() => navigation.navigate("Register10")}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 }

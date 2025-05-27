@@ -1,4 +1,4 @@
-import React, { useState, useContext, useRef } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useThemeContext } from "../../../global/contexts/ThemeContext";
 import { UserContext } from "../../../global/contexts/UserContext";
+import { getData, clearData } from "../../../global/utils/storage";
 import { supabase } from "../../../global/services/supabaseService";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
@@ -81,6 +82,18 @@ export default function HomeScreen({ navigation }) {
   const { colors, typography } = useThemeContext();
   const { user, refreshUser } = useContext(UserContext);
 
+  // After redirecting to the Profile stack and having the mustChangePassword, you'll be redirected to the correct screen
+  useEffect(() => {
+    const checkMustChangePassword = async () => {
+      const flag = await getData("mustChangePassword");
+      if (flag) {
+        navigation.navigate("Profile");
+      }
+    };
+    checkMustChangePassword();
+  }, []);
+
+
   // Get gyms and active gym from user.settings.performance_data
   const storedGyms = user?.settings?.performance_data?.stored_gyms || [];
   const activeGym = user?.settings?.performance_data?.active_gym || null;
@@ -142,7 +155,6 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-
   // Delete gym handler (removes from user settings and Supabase)
   const deleteGym = async (gymId) => {
     closeGymMenu();
@@ -192,8 +204,6 @@ export default function HomeScreen({ navigation }) {
       console.error(`[Gym] Error updating user settings:`, updateError);
     }
   };
-
-
 
   // Open ellipsis menu for a gym
   const openGymMenu = (gymId) => setMenuGymId(gymId);
@@ -264,11 +274,6 @@ export default function HomeScreen({ navigation }) {
       overflow: "hidden",
       flexShrink: 1,
       flexGrow: 0,
-    },
-    gymLocation: {
-      color: colors.text.white,
-      opacity: 0.8,
-      fontSize: 12,
     },
     gymEquipment: {
       color: colors.text.white,
@@ -385,11 +390,6 @@ export default function HomeScreen({ navigation }) {
     gymName: {
       ...typography.bodyMedium,
       color: colors.text.white,
-    },
-    gymLocation: {
-      color: colors.text.white,
-      opacity: 0.8,
-      fontSize: 12,
     },
     addButton: {
       marginTop: 24,
@@ -862,9 +862,6 @@ export default function HomeScreen({ navigation }) {
                   <ScrollView contentContainerStyle={{ paddingBottom: 32, paddingTop: 8 }}>
                     {gymsDetails.map((gym, idx) => {
                       let displayName = gym.name || "Unknown";
-                      if (!displayName.trim().toLowerCase().endsWith("gym")) {
-                        displayName = displayName + " gym";
-                      }
                       const isActive = localActiveGym === gym.id;
                       return (
                         <View
@@ -892,9 +889,7 @@ export default function HomeScreen({ navigation }) {
                                 >
                                   {displayName}
                                 </Text>
-                                <Text style={modalStyles.gymId}>ID: {gym.id}</Text>
                               </View>
-                              <Text style={modalStyles.gymLocation}>{gym.location}</Text>
                               <Text style={modalStyles.gymEquipment}>
                                 Equipment: {gym.equipmentCount}
                               </Text>
@@ -955,20 +950,6 @@ export default function HomeScreen({ navigation }) {
             </View>
           </View>
         </Modal>
-
-        {/* Trigger for modal */}
-        <TouchableOpacity
-          onPress={handleOpenGymModal}
-          style={{
-            marginTop: 24,
-            backgroundColor: colors.bg.primary,
-            padding: 12,
-            borderRadius: 8,
-            alignSelf: "center",
-          }}
-        >
-          <Text style={{ color: colors.text.white, fontWeight: "bold" }}>Open Gym Modal</Text>
-        </TouchableOpacity>
       </View>
     </ScrollView>
   );

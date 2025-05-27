@@ -1,12 +1,22 @@
 import React, { useState, useEffect } from "react";
-import { View, TextInput, StyleSheet, Text, TouchableOpacity, Platform, KeyboardAvoidingView, Keyboard, ActivityIndicator } from "react-native";
+import {
+  View,
+  TextInput,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  Platform,
+  KeyboardAvoidingView,
+  Keyboard,
+  ActivityIndicator,
+} from "react-native";
 import { FontAwesome, Feather } from "@expo/vector-icons";
 import { useThemeContext } from "../../../global/contexts/ThemeContext";
-import { BackButton, ActionButton, HeaderBlock } from "../../../global/components/UIElements";
-import { useRegisterUser } from "../hooks/useRegisterUser";
+import { supabase } from "../../../global/services/supabaseService";
 import { clearData } from "../../../global/utils/storage";
+import { ActionButton, HeaderBlock } from "../../../global/components/UIElements";
 
-export default function Register10({ navigation }) {
+export default function ChangePasswordScreen({ navigation }) {
   const { colors, typography } = useThemeContext();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -14,19 +24,17 @@ export default function Register10({ navigation }) {
   const [isValid, setIsValid] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const { handleRegister, loading: hookLoading, error: registerError } = useRegisterUser();
-  const [localLoading, setLocalLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [info, setInfo] = useState("");
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   useEffect(() => {
     const keyboardShowListener = Keyboard.addListener("keyboardDidShow", () => {
       setIsKeyboardVisible(true);
     });
-
     const keyboardHideListener = Keyboard.addListener("keyboardDidHide", () => {
       setIsKeyboardVisible(false);
     });
-
     return () => {
       keyboardShowListener.remove();
       keyboardHideListener.remove();
@@ -36,48 +44,50 @@ export default function Register10({ navigation }) {
   useEffect(() => {
     const timeout = setTimeout(() => {
       validatePasswords(password, confirmPassword);
-    }, 500);
+    }, 400);
     return () => clearTimeout(timeout);
   }, [password, confirmPassword]);
 
   const validatePasswords = (pass, confirm) => {
     const secureRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
-
     if (!pass || !confirm) {
       setIsValid(false);
       setError("");
       return;
     }
-
     if (!secureRegex.test(pass)) {
       setIsValid(false);
       setError("Password must be 8+ characters, with uppercase, lowercase, number and symbol");
       return;
     }
-
     if (pass !== confirm) {
       setIsValid(false);
       setError("Passwords do not match");
       return;
     }
-
     setIsValid(true);
     setError("");
   };
 
-  const onSubmit = async () => {
-    if (!isValid || hookLoading || localLoading) return;
-    setLocalLoading(true);
-
-    // Success callback: clear storage and navigate
-    const onSuccess = () => {
-      clearData("registrationData");
-      navigation.replace("Login", { registrationSuccess: true });
-    };
-
-    await handleRegister(password, onSuccess);
-    setLocalLoading(false);
-  }
+  const handleChangePassword = async () => {
+    if (!isValid || loading) return;
+    setLoading(true);
+    setError("");
+    setInfo("");
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      setInfo("Password changed successfully!");
+      await clearData("mustChangePassword");
+      setTimeout(() => {
+        navigation.replace("Home");
+      }, 1200);
+    } catch (err) {
+      setError(err.message || "Could not change password.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const styles = StyleSheet.create({
     container: {
@@ -90,10 +100,17 @@ export default function Register10({ navigation }) {
       color: colors.text.danger,
       marginTop: 8,
       ...typography.bodySmall,
+      textAlign: "center",
+    },
+    infoText: {
+      color: colors.text.success,
+      marginTop: 8,
+      ...typography.bodySmall,
+      textAlign: "center",
     },
     loadingContainer: {
       alignItems: "center",
-      marginVertical: 16
+      marginVertical: 16,
     },
     loadingText: {
       color: colors.text.primary,
@@ -104,7 +121,7 @@ export default function Register10({ navigation }) {
     inputWrapper: {
       flexDirection: "row",
       alignItems: "center",
-      backgroundColor: colors.input.background,
+      backgroundColor: colors.input.background || colors.card,
       borderWidth: 1,
       borderRadius: 4,
       paddingHorizontal: 12,
@@ -146,10 +163,8 @@ export default function Register10({ navigation }) {
       enabled={isKeyboardVisible}
       style={styles.container}
     >
-      <BackButton onPress={() => navigation.goBack()} />
-
       <HeaderBlock
-        title="Create a password"
+        title="Set a new password"
         subtitle="Must be at least 8 characters, with uppercase, number and symbol"
       />
 
@@ -194,22 +209,20 @@ export default function Register10({ navigation }) {
       </View>
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      {registerError ? <Text style={styles.errorText}>{registerError}</Text> : null}
+      {info ? <Text style={styles.infoText}>{info}</Text> : null}
 
-      {(hookLoading || localLoading) && (
+      {loading && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="small" color={colors.text.primary} />
-          <Text style={styles.loadingText}>Creating user...</Text>
+          <Text style={styles.loadingText}>Processing...</Text>
         </View>
       )}
 
       <ActionButton
-        text="Create account"
-        disabled={!isValid}
-        onPress={onSubmit}
+        text="Change password"
+        disabled={!isValid || loading}
+        onPress={handleChangePassword}
       />
-
     </KeyboardAvoidingView>
-
   );
 }

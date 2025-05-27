@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { loginUser } from "../services/authService";
-import { customHash } from "../../../global/utils/hash";
 
 export const useLogin = () => {
   const [loading, setLoading] = useState(false);
@@ -10,8 +9,7 @@ export const useLogin = () => {
     setLoading(true);
     setError("");
     try {
-      const hashedPassword = await customHash(password);
-      const userData = await loginUser(email, hashedPassword);
+      const userData = await loginUser(email, password);
       if (!userData) throw new Error("Invalid email or password");
       return userData;
     } catch (err) {

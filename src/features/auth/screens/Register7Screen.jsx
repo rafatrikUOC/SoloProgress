@@ -37,12 +37,12 @@ export default function Register7({ navigation }) {
   const [infoVisible, setInfoVisible] = useState(false);
   const [currentDescription, setCurrentDescription] = useState("");
 
-  // Cargar el nivel de actividad previamente almacenado
+  // Load data previously stored
   useEffect(() => {
     const loadActivityLevel = async () => {
       const registrationData = await getData("registrationData");
       if (registrationData && registrationData.activityLevel) {
-        setSelectedLevel(registrationData.activityLevel);  // Cargar el nivel de actividad
+        setSelectedLevel(registrationData.activityLevel);
       }
     };
     loadActivityLevel();
@@ -50,7 +50,7 @@ export default function Register7({ navigation }) {
 
   const handleSelect = (level) => {
     setSelectedLevel(level.label);
-    saveActivityLevelData(level);  // Guardar el nivel de actividad seleccionado
+    saveActivityLevelData(level);
   };
 
   const openInfo = (description) => {
@@ -63,7 +63,7 @@ export default function Register7({ navigation }) {
     const prev = await getData("registrationData");
     const finalData = {
       ...prev,
-      activityLevel: level.label,  // Guardar el nivel de actividad
+      activityLevel: level.label,
     };
     await saveData("registrationData", finalData);
   };

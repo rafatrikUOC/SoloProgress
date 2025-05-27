@@ -1,11 +1,11 @@
-import React, { useContext, useEffect } from "react";
+import React, { useContext } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import Toast from "react-native-toast-message";
+import { UserContext } from "../global/contexts/UserContext";
 
 import AuthStack from "./AuthStack";
 import BottomTabs from "./BottomTabs";
 import OnboardingStack from "./OnboardingStack";
-import { UserContext } from "../global/contexts/UserContext";
 
 export default function RootNavigator({ isFirstLaunch }) {
   const { user } = useContext(UserContext);

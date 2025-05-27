@@ -13,9 +13,9 @@ import { clearData } from "../../../global/utils/storage";
 export default function Onboarding1({ navigation }) {
   const { colors, typography } = useThemeContext();
 
-  // Clear the registrationData from AsyncStorage when the component mounts
+  // Clear the registrationData
   useEffect(() => {
-    clearData("registrationData"); // Remove the registrationData from AsyncStorage
+    clearData("registrationData");
   }, []);
 
   const styles = StyleSheet.create({

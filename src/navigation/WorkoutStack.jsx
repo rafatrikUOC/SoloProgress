@@ -18,7 +18,6 @@ import RoutineLibraryScreen from "../features/workout/screens/RoutineLibraryScre
 // Other features screens
 import ExerciseScreen from "../features/exercises/screens/ExerciseScreen";
 
-
 const Stack = createStackNavigator();
 
 export default function WorkoutStack() {

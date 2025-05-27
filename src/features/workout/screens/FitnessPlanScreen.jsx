@@ -118,8 +118,8 @@ export default function FitnessPlanScreen({ navigation }) {
         onPress: "FitnessExperience",
       },
       {
-        title: user.settings.workout_duration
-          ? `${user.settings.workout_duration} minutes`
+        title: user.settings.app_preferences.workout_duration
+          ? `${user.settings.app_preferences.workout_duration} minutes`
           : "No duration set",
         subtitle: "Workout duration",
         style: "secondary",

@@ -7,14 +7,21 @@ export default function ProfileScreen({ navigation }) {
   const { setUser } = useContext(UserContext);
 
   const handleLogout = async () => {
+    // 1. Sign out from Supabase
+    await supabase.auth.signOut();
+
+    // 2. Clear user context
     setUser({ info: null, settings: null, split: null });
+
+    // 3. Redirect to login (Auth stack)
+    navigation.replace("Auth");
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>Profile Screen</Text>
+      <Text style={styles.text}>Profile screen</Text>
       <TouchableOpacity style={styles.button} onPress={handleLogout}>
-        <Text style={styles.buttonText}>Cerrar sesión</Text>
+        <Text style={styles.buttonText}>Log out</Text>
       </TouchableOpacity>
     </View>
   );

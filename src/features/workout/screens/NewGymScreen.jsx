@@ -1,16 +1,5 @@
 import React, { useState, useEffect, useContext } from "react";
-import {
-  View,
-  TextInput,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  Modal,
-  ScrollView,
-  ActivityIndicator,
-  Platform,
-  KeyboardAvoidingView,
-} from "react-native";
+import { View, TextInput, StyleSheet, Text, TouchableOpacity, Modal, ScrollView, ActivityIndicator, Platform, KeyboardAvoidingView, Keyboard } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useThemeContext } from "../../../global/contexts/ThemeContext";
 import { BackButton, ActionButton, ScreenTitle } from "../../../global/components/UIElements";
@@ -85,6 +74,22 @@ export default function NewGym({ navigation, route }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(!!gym_id);
   const [infoModal, setInfoModal] = useState({ visible: false, description: "" });
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const keyboardShowListener = Keyboard.addListener("keyboardDidShow", () => {
+      setIsKeyboardVisible(true);
+    });
+
+    const keyboardHideListener = Keyboard.addListener("keyboardDidHide", () => {
+      setIsKeyboardVisible(false);
+    });
+
+    return () => {
+      keyboardShowListener.remove();
+      keyboardHideListener.remove();
+    };
+  }, []);
 
   // Load gym data if editing
   useEffect(() => {
@@ -455,7 +460,8 @@ export default function NewGym({ navigation, route }) {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      enabled={isKeyboardVisible}
       style={styles.container}
     >
       <BackButton onPress={() => navigation.goBack()} />
