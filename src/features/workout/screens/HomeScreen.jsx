@@ -14,7 +14,8 @@ import {
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useThemeContext } from "../../../global/contexts/ThemeContext";
 import { UserContext } from "../../../global/contexts/UserContext";
-import { getData } from "../../../global/utils/storage";
+import ToastMessage from "../../../global/components/ToastMessage";
+import { getData, clearData } from "../../../global/utils/storage";
 import { supabase } from "../../../global/services/supabaseService";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
@@ -81,6 +82,7 @@ async function fetchGymDetailsById(gym_id) {
 export default function HomeScreen({ navigation }) {
   const { colors, typography } = useThemeContext();
   const { user, refreshUser } = useContext(UserContext);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
 
   // After redirecting to the Profile stack and having the mustChangePassword, you'll be redirected to the correct screen
   useEffect(() => {
@@ -92,6 +94,26 @@ export default function HomeScreen({ navigation }) {
     };
     checkMustChangePassword();
   }, []);
+
+  useEffect(() => {
+    const checkToast = async () => {
+      const flag = await getData("ChangePasswordSuccess");
+      if (flag) {
+        setShowSuccessToast(true);
+        await clearData("ChangePasswordSuccess");
+      }
+    };
+    checkToast();
+  }, []);
+
+  useEffect(() => {
+    if (showSuccessToast) {
+      const timer = setTimeout(() => {
+        setShowSuccessToast(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccessToast]);
 
 
   // Get gyms and active gym from user.settings.performance_data
@@ -668,7 +690,19 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <ScrollView style={styles.scrollView}>
+      <ToastMessage
+        message={"TEST TOAST"}
+        type={"success"}
+      />
       <View style={styles.container}>
+        {/* Show success toast after changing password */}
+        {showSuccessToast && (
+          <ToastMessage
+            message={"Password changed successfully."}
+            type={"success"}
+          />
+        )}
+
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.drawerWelcome}>

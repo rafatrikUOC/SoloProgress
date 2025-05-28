@@ -310,7 +310,7 @@ export default function NextWorkoutScreen({ navigation }) {
 					<View style={styles.exerciseCard} key={idx}>
 						<TouchableOpacity
 							style={styles.exerciseImageWrapper}
-							onPress={() => navigation.navigate("Exercise", { exerciseId: 1 })}
+							onPress={() => navigation.navigate("ExerciseTest", { exerciseId: 1 })}
 							activeOpacity={0.8}
 						>
 							<Image

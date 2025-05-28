@@ -55,10 +55,46 @@ export default function BottomTabs() {
 				},
 			})}
 		>
-			<Tab.Screen name="Home" component={HomeStack} />
-			<Tab.Screen name="Exercises" component={ExercisesStack} />
-			<Tab.Screen name="Routines" component={RoutinesStack} />
-			<Tab.Screen name="Profile" component={ProfileStack} />
+			<Tab.Screen
+				name="Home"
+				component={HomeStack}
+				listeners={({ navigation }) => ({
+					tabPress: e => {
+						navigation.navigate("Home", { screen: undefined });
+					},
+				})}
+			/>
+			<Tab.Screen
+				name="Exercises"
+				component={ExercisesStack}
+				listeners={({ navigation }) => ({
+					tabPress: e => {
+						navigation.navigate("Exercises", {
+							screen: "Exercises",
+							params: { reset: Date.now() },
+						});
+					},
+				})}
+			/>
+			<Tab.Screen
+				name="Routines"
+				component={RoutinesStack}
+				listeners={({ navigation }) => ({
+					tabPress: e => {
+						navigation.navigate("Routines", { screen: undefined });
+					},
+				})}
+			/>
+			<Tab.Screen
+				name="Profile"
+				component={ProfileStack}
+				listeners={({ navigation }) => ({
+					tabPress: e => {
+						navigation.navigate("Profile", { screen: undefined });
+					},
+				})}
+			/>
+
 		</Tab.Navigator>
 	);
 }

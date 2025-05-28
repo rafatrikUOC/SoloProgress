@@ -13,7 +13,7 @@ import {
 import { FontAwesome, Feather } from "@expo/vector-icons";
 import { useThemeContext } from "../../../global/contexts/ThemeContext";
 import { supabase } from "../../../global/services/supabaseService";
-import { clearData } from "../../../global/utils/storage";
+import { saveData, clearData } from "../../../global/utils/storage";
 import { UserContext } from "../../../global/contexts/UserContext";
 import { ActionButton, HeaderBlock } from "../../../global/components/UIElements";
 
@@ -28,7 +28,6 @@ export default function ChangePasswordScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [info, setInfo] = useState("");
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-  const { setUser } = useContext(UserContext);
 
   useEffect(() => {
     const keyboardShowListener = Keyboard.addListener("keyboardDidShow", () => {
@@ -77,13 +76,24 @@ export default function ChangePasswordScreen({ navigation }) {
     setError("");
     setInfo("");
     try {
+      console.log("[ChangePassword] Guardando flag de éxito en AsyncStorage...");
+      await saveData("ChangePasswordSuccess", true);
+  
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
+  
+      console.log("[ChangePassword] Contraseña cambiada correctamente.");
       await clearData("mustChangePassword");
+      console.log("[ChangePassword] mustChangePassword limpiado.");
+  
+      // Navega a HomeScreen (ajusta según tu navegación)
+      console.log("[ChangePassword] Navegando a Home...");
     } catch (err) {
       setError(err.message || "Could not change password.");
+      console.log("[ChangePassword] Error:", err.message || err);
     } finally {
       setLoading(false);
+      console.log("[ChangePassword] handleChangePassword finalizado.");
     }
   };
 

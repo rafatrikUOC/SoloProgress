@@ -42,3 +42,4 @@ logs
 
 # Own files
 ToDoList
+.vscode/settings.json

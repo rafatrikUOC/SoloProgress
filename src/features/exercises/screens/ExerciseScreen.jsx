@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,41 +6,13 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useThemeContext } from "../../../global/contexts/ThemeContext";
 import { BackButton } from "../../../global/components/UIElements";
 import MuscleIcon from "../../../global/components/MuscleIcon";
-
-// Dummy data for demonstration
-const EXERCISE_DATA = {
-  name: "Incline Dumbbell Press",
-  image: "https://www.bodybuilding.com/images/2021/july/incline-dumbbell-fly-700x700.jpg",
-  instructions: [
-    "Lie back on an incline bench with a dumbbell in each hand.",
-    "Press the weights above your chest, arms extended.",
-    "Lower the dumbbells slowly to chest level.",
-    "Push the weights back up to the starting position.",
-    "Repeat for the desired number of reps."
-  ],
-  target: {
-    primary: { name: "Chest" },
-    secondary: [
-      { name: "Shoulders" },
-      { name: "Triceps" }
-    ]
-  },
-  equipment: [
-    {
-      name: "Dumbbells",
-      image: "https://img.icons8.com/ios-filled/100/000000/dumbbell.png"
-    },
-    {
-      name: "Flat bench",
-      image: "https://img.icons8.com/ios-filled/100/000000/bench-press-with-bar.png"
-    }
-  ]
-};
+import { fetchExerciseById } from "../services/exerciseService";
 
 const TABS = [
   { key: "instructions", label: "Instructions" },
@@ -48,14 +20,46 @@ const TABS = [
   { key: "equipment", label: "Equipment" }
 ];
 
+const DEFAULT_IMAGE = "https://via.placeholder.com/400x250?text=No+Image";
+
+function parseJsonField(field) {
+  if (Array.isArray(field)) return field;
+  if (typeof field === "string") {
+    try {
+      const parsed = JSON.parse(field);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // fallback: treat as comma-separated string
+      return field
+        .split(",")
+        .map(s => s.replace(/^\s*"?|"?\s*$/g, "")) // remove extra quotes and trim
+        .filter(Boolean);
+    }
+  }
+  return [];
+}
+
 export default function ExerciseScreen({ navigation, route }) {
-  // const { exerciseId } = route.params; // Use this to fetch real data
+  const { exerciseId } = route.params;
   const { colors } = useThemeContext();
   const insets = useSafeAreaInsets();
   const [selectedTab, setSelectedTab] = useState("instructions");
+  const [exercise, setExercise] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // For demo, use dummy data
-  const exercise = EXERCISE_DATA;
+  useEffect(() => {
+    async function loadExercise() {
+      setLoading(true);
+      try {
+        const data = await fetchExerciseById(exerciseId);
+        setExercise(data);
+      } catch (e) {
+        setExercise(null);
+      }
+      setLoading(false);
+    }
+    loadExercise();
+  }, [exerciseId]);
 
   const styles = StyleSheet.create({
     container: {
@@ -71,6 +75,8 @@ export default function ExerciseScreen({ navigation, route }) {
       backgroundColor: "#222",
       position: "relative",
       marginBottom: 16,
+      justifyContent: "center",
+      alignItems: "center",
     },
     exerciseImage: {
       width: "100%",
@@ -139,64 +145,46 @@ export default function ExerciseScreen({ navigation, route }) {
       flex: 1,
     },
     targetSection: {
-        paddingHorizontal: 18,
-      },
-      targetTitle: {
-        color: colors.text.muted,
-        fontWeight: "600",
-        fontSize: 15,
-        marginBottom: 6,
-        marginTop: 10,
-      },
-      muscleRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginBottom: 14,
-        marginLeft: 4,
-      },
-      muscleNameLarge: {
-        color: colors.text.white,
-        fontSize: 18,
-        fontWeight: "bold",
-        marginLeft: 18,
-      },
-      
-    muscleIcon: {
-      marginRight: 10,
-    },
-    muscleName: {
-      color: colors.text.white,
-      fontSize: 16,
-      fontWeight: "bold",
-    },
-    secondaryMusclesList: {
-      flexDirection: "row",
-      alignItems: "center",
-      flexWrap: "wrap",
-      marginTop: 2,
-    },
-    equipmentSection: {
       paddingHorizontal: 18,
     },
-    equipmentList: {
-      marginTop: 8,
+    targetTitle: {
+      color: colors.text.muted,
+      fontWeight: "600",
+      fontSize: 15,
+      marginBottom: 6,
+      marginTop: 10,
     },
-    equipmentRow: {
+    equipmentPill: {
+      backgroundColor: colors.card,
+      borderColor: colors.text.primary,
+      borderWidth: 1,
+      borderRadius: 16,
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      marginRight: 10,
+      marginBottom: 10,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    equipmentPillText: {
+      color: colors.text.primary,
+      fontWeight: "bold",
+      fontSize: 16,
+    },
+    muscleRow: {
       flexDirection: "row",
       alignItems: "center",
       marginBottom: 14,
+      marginLeft: 4,
     },
-    equipmentImage: {
-      width: 38,
-      height: 38,
-      borderRadius: 8,
-      marginRight: 12,
-      backgroundColor: "#333",
-    },
-    equipmentName: {
+    muscleNameLarge: {
       color: colors.text.white,
-      fontSize: 16,
+      fontSize: 18,
       fontWeight: "bold",
+      marginLeft: 18,
+    },
+    equipmentSection: {
+      paddingHorizontal: 18,
     },
     noEquipment: {
       color: colors.text.muted,
@@ -204,24 +192,80 @@ export default function ExerciseScreen({ navigation, route }) {
       marginTop: 12,
       marginLeft: 2,
     },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    noDataText: {
+      color: colors.text.muted,
+      fontSize: 18,
+      textAlign: "center",
+      marginTop: 60,
+    },
   });
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.text.primary} />
+      </View>
+    );
+  }
+
+  if (!exercise) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.noDataText}>Exercise not found.</Text>
+        <BackButton onPress={() => navigation.goBack()} />
+      </View>
+    );
+  }
+
+  // Parse instructions, secondary muscles, and equipment
+  let instructions = [];
+  if (Array.isArray(exercise.instructions)) {
+    instructions = exercise.instructions;
+  } else if (typeof exercise.instructions === "string") {
+    try {
+      const parsed = JSON.parse(exercise.instructions);
+      if (Array.isArray(parsed)) {
+        instructions = parsed;
+      } else {
+        instructions = exercise.instructions
+          .split(",")
+          .map(step => step.replace(/^\s*"?|"?\s*$/g, ""))
+          .filter(Boolean);
+      }
+    } catch {
+      instructions = exercise.instructions
+        .split(",")
+        .map(step => step.replace(/^\s*"?|"?\s*$/g, ""))
+        .filter(Boolean);
+    }
+  }
+
+  const secondaryMuscles = parseJsonField(exercise.secondary_muscles);
+  const equipment = parseJsonField(exercise.equipment_required);
 
   return (
     <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.scroll}>
-        {/* Imagen y Back */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.scroll}
+      >
+        {/* Image and Back */}
         <View style={styles.imageWrapper}>
           <Image
-            source={{ uri: exercise.image }}
+            source={{ uri: exercise.image || DEFAULT_IMAGE }}
             style={styles.exerciseImage}
             resizeMode="cover"
           />
-        <BackButton light onPress={() => navigation.goBack()} />
+          <BackButton light onPress={() => navigation.goBack()} />
         </View>
 
-        {/* Video & instructions label */}
         <Text style={styles.sectionLabel}>Video & instructions</Text>
-        {/* Nombre del ejercicio */}
         <Text style={styles.exerciseName}>{exercise.name}</Text>
 
         {/* Tabs */}
@@ -250,56 +294,57 @@ export default function ExerciseScreen({ navigation, route }) {
         {/* Tab content */}
         {selectedTab === "instructions" && (
           <View style={styles.instructionsList}>
-            {exercise.instructions.map((step, idx) => (
-              <View style={styles.instructionStep} key={idx}>
-                <Text style={styles.stepNumber}>{idx + 1}.</Text>
-                <Text style={styles.stepText}>{step}</Text>
-              </View>
-            ))}
+            {instructions.length > 0 ? (
+              instructions.map((step, idx) => (
+                <View style={styles.instructionStep} key={idx}>
+                  <Text style={styles.stepNumber}>{idx + 1}.</Text>
+                  <Text style={styles.stepText}>{step}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.noDataText}>No instructions available.</Text>
+            )}
           </View>
         )}
 
-{selectedTab === "target" && (
-  <View style={styles.targetSection}>
-    <Text style={styles.targetTitle}>Primary muscle</Text>
-    <View style={styles.muscleRow}>
-      <MuscleIcon muscle={exercise.target.primary.name} size={48} />
-      <Text style={styles.muscleNameLarge}>{exercise.target.primary.name}</Text>
-    </View>
+        {selectedTab === "target" && (
+          <View style={styles.targetSection}>
+            <Text style={styles.targetTitle}>Primary muscle</Text>
+            <View style={styles.muscleRow}>
+              <MuscleIcon muscle={exercise.primary_muscle} size={40} />
+              <Text style={styles.muscleNameLarge}>{exercise.primary_muscle}</Text>
+            </View>
 
-    <Text style={[styles.targetTitle, { marginTop: 18 }]}>Secondary muscles</Text>
-    {exercise.target.secondary.length === 0 ? (
-      <Text style={styles.muscleNameLarge}>None</Text>
-    ) : (
-      exercise.target.secondary.map((muscle, idx) => (
-        <View style={styles.muscleRow} key={idx}>
-          <MuscleIcon muscle={muscle.name} size={40} />
-          <Text style={styles.muscleNameLarge}>{muscle.name}</Text>
-        </View>
-      ))
-    )}
-  </View>
-)}
+            <Text style={[styles.targetTitle, { marginTop: 18 }]}>Secondary muscles</Text>
+            {secondaryMuscles.length === 0 ? (
+              <Text style={styles.muscleNameLarge}>None</Text>
+            ) : (
+              secondaryMuscles.map((muscle, idx) => (
+                <View style={styles.muscleRow} key={idx}>
+                  <MuscleIcon muscle={muscle} size={40} />
+                  <Text style={styles.muscleNameLarge}>{muscle}</Text>
+                </View>
+              ))
+            )}
+          </View>
+        )}
 
-{selectedTab === "equipment" && (
-  <View style={styles.equipmentSection}>
-    {(!exercise.equipment || exercise.equipment.length === 0) ? (
-      <Text style={styles.noEquipment}>No equipment required</Text>
-    ) : (
-      exercise.equipment.map((item, idx) => (
-        <View style={styles.muscleRow} key={idx}>
-          <Image
-            source={{ uri: item.image }}
-            style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: "#333" }}
-            resizeMode="contain"
-          />
-          <Text style={styles.muscleNameLarge}>{item.name}</Text>
-        </View>
-      ))
-    )}
-  </View>
-)}
-
+        {selectedTab === "equipment" && (
+          <View style={styles.equipmentSection}>
+            <Text style={styles.targetTitle}>Equipment required</Text>
+            {equipment.length === 0 ? (
+              <Text style={styles.noEquipment}>No equipment required</Text>
+            ) : (
+              <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 8 }}>
+                {equipment.map((item, idx) => (
+                  <View style={styles.equipmentPill} key={idx}>
+                    <Text style={styles.equipmentPillText}>{item}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
