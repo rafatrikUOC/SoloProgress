@@ -76,24 +76,16 @@ export default function ChangePasswordScreen({ navigation }) {
     setError("");
     setInfo("");
     try {
-      console.log("[ChangePassword] Guardando flag de éxito en AsyncStorage...");
       await saveData("ChangePasswordSuccess", true);
-  
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
-  
-      console.log("[ChangePassword] Contraseña cambiada correctamente.");
       await clearData("mustChangePassword");
-      console.log("[ChangePassword] mustChangePassword limpiado.");
   
       // Navega a HomeScreen (ajusta según tu navegación)
-      console.log("[ChangePassword] Navegando a Home...");
     } catch (err) {
       setError(err.message || "Could not change password.");
-      console.log("[ChangePassword] Error:", err.message || err);
     } finally {
       setLoading(false);
-      console.log("[ChangePassword] handleChangePassword finalizado.");
     }
   };
 

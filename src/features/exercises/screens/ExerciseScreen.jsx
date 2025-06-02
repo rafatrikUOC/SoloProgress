@@ -32,7 +32,7 @@ function parseJsonField(field) {
       // fallback: treat as comma-separated string
       return field
         .split(",")
-        .map(s => s.replace(/^\s*"?|"?\s*$/g, "")) // remove extra quotes and trim
+        .map(s => s.replace(/^\s*"?|"?\s*$/g, ""))
         .filter(Boolean);
     }
   }

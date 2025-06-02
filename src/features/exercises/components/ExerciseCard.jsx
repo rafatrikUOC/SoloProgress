@@ -9,6 +9,27 @@ const DEFAULT_IMAGE = "https://via.placeholder.com/60?text=No+Image";
 export const ExerciseCard = ({ exercise, onMenuPress, onPress }) => {
   const { colors } = useThemeContext();
 
+  if (!exercise) {
+    return (
+      <View style={[styles.exerciseCard, { backgroundColor: "#222", minHeight: 80, justifyContent: "center", alignItems: "center" }]}>
+        <Text style={{ color: "#fff" }}>Exercise not found</Text>
+      </View>
+    );
+  }
+
+  // Maneja el JSON de fotos (ajusta según tu estructura real)
+  let imageUrl = DEFAULT_IMAGE;
+  if (Array.isArray(exercise.photos) && exercise.photos.length > 0) {
+    // Si es array de strings
+    if (typeof exercise.photos[0] === "string") {
+      imageUrl = exercise.photos[0];
+    }
+    // Si es array de objetos { url: ... }
+    else if (exercise.photos[0].url) {
+      imageUrl = exercise.photos[0].url;
+    }
+  }
+
   return (
     <TouchableOpacity
       style={[styles.exerciseCard, { backgroundColor: colors.card }]}
@@ -18,12 +39,7 @@ export const ExerciseCard = ({ exercise, onMenuPress, onPress }) => {
       {/* Exercise image with muscle badge */}
       <View style={styles.exerciseImageWrapper}>
         <Image
-          source={{
-            uri:
-              exercise.image && exercise.image.trim() !== ""
-                ? exercise.image
-                : DEFAULT_IMAGE,
-          }}
+          source={{ uri: imageUrl }}
           style={[styles.exerciseImage, { backgroundColor: colors.body }]}
           resizeMode="cover"
         />
@@ -62,6 +78,7 @@ export const ExerciseCard = ({ exercise, onMenuPress, onPress }) => {
     </TouchableOpacity>
   );
 };
+
 
 const styles = StyleSheet.create({
   exerciseCard: {

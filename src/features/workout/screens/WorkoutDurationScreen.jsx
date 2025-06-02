@@ -11,6 +11,7 @@ import { useThemeContext } from "../../../global/contexts/ThemeContext";
 import { BackButton, ScreenTitle } from "../../../global/components/UIElements";
 import { supabase } from "../../../global/services/supabaseService";
 import { UserContext } from "../../../global/contexts/UserContext";
+import { generateAndStorePlannedWorkouts } from "../services/plannedWorkoutService";
 
 const MIN_DURATION = 15;
 const MAX_DURATION = 120;
@@ -20,11 +21,12 @@ export default function WorkoutDurationScreen({ navigation }) {
   const { colors } = useThemeContext();
   const { user, refreshUser, setUser } = useContext(UserContext);
 
-  // Duration state is undefined until loaded from user preferences
   const [duration, setDuration] = useState(undefined);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [feedback, setFeedback] = useState("");
 
-  // Load initial value from user settings
+  // Load initial workout duration from user settings
   useEffect(() => {
     setIsLoading(true);
     const appPrefs = user?.settings?.app_preferences;
@@ -49,18 +51,16 @@ export default function WorkoutDurationScreen({ navigation }) {
     setDuration(value);
   };
 
-  // Optimistic update and save to Supabase
+  // Save the new duration and regenerate planned workouts
   const handleSlidingComplete = async (value) => {
     setDuration(value);
 
-    // Get current preferences
     const prevAppPrefs = user?.settings?.app_preferences
       ? (typeof user.settings.app_preferences === "string"
           ? JSON.parse(user.settings.app_preferences)
           : user.settings.app_preferences)
       : {};
 
-    // Optimistically update user context
     setUser((prevUser) => ({
       ...prevUser,
       settings: {
@@ -72,7 +72,9 @@ export default function WorkoutDurationScreen({ navigation }) {
       },
     }));
 
-    // Save to Supabase
+    setIsProcessing(true);
+    setFeedback("Updating workouts...");
+
     try {
       await supabase
         .from("UserSettings")
@@ -83,9 +85,27 @@ export default function WorkoutDurationScreen({ navigation }) {
           },
         })
         .eq("user_id", user.info.id);
-      refreshUser();
+
+      await refreshUser();
+
+      const updatedUser = typeof user === "function" ? user() : user;
+      const split = updatedUser?.split || user?.split;
+      const gymId = updatedUser?.settings?.performance_data?.active_gym || user?.settings?.performance_data?.active_gym;
+      const userGoal = updatedUser?.settings?.fitness_goal || user?.settings?.fitness_goal || "Build muscle mass";
+
+      if (split && gymId) {
+        await generateAndStorePlannedWorkouts({
+          userId: user.info.id,
+          split,
+          gymId,
+          userGoal,
+          workoutDuration: value
+        });
+        setFeedback("Workouts updated!");
+      } else {
+        setFeedback("Could not update workouts (missing split or gym).");
+      }
     } catch (error) {
-      // Revert local change if update fails
       setUser((prevUser) => ({
         ...prevUser,
         settings: {
@@ -94,6 +114,12 @@ export default function WorkoutDurationScreen({ navigation }) {
         },
       }));
       setDuration(prevAppPrefs.workout_duration || MIN_DURATION);
+      setFeedback("Failed to update workouts.");
+    } finally {
+      setTimeout(() => {
+        setIsProcessing(false);
+        setFeedback("");
+      }, 1200);
     }
   };
 
@@ -103,9 +129,23 @@ export default function WorkoutDurationScreen({ navigation }) {
       backgroundColor: colors.body,
       padding: 24,
     },
-    sliderContainer: {
-      marginTop: 48,
+    infoBox: {
+      backgroundColor: colors.card,
+      borderRadius: 10,
+      padding: 14,
       marginBottom: 32,
+      marginTop: 8,
+      borderLeftWidth: 4,
+      borderLeftColor: colors.bg.primary,
+    },
+    infoText: {
+      color: colors.text.muted,
+      fontSize: 15,
+      textAlign: "left",
+    },
+    sliderContainer: {
+      marginTop: 12,
+      marginBottom: 56,
       alignItems: "center",
     },
     durationValue: {
@@ -129,6 +169,12 @@ export default function WorkoutDurationScreen({ navigation }) {
       fontSize: 12,
       color: colors.text.muted,
     },
+    feedback: {
+      marginTop: 10,
+      fontSize: 16,
+      color: colors.text.primary,
+      textAlign: "center",
+    }
   });
 
   // Generate marks for slider
@@ -142,8 +188,17 @@ export default function WorkoutDurationScreen({ navigation }) {
       <BackButton onPress={() => navigation.goBack()} />
       <ScrollView showsVerticalScrollIndicator={false}>
         <ScreenTitle title="Workout duration" />
+
+        {/* Info box about the effect of changing workout duration */}
+        <View style={styles.infoBox}>
+          <Text style={styles.infoText}>
+            Changing this value will automatically regenerate your planned split workouts
+            (as long as you have a split and an active gym selected).
+          </Text>
+        </View>
+
         <View style={styles.sliderContainer}>
-          {/* Show loader while duration is loading */}
+          {/* Show loader while duration is loading or processing */}
           {isLoading || typeof duration !== "number" ? (
             <ActivityIndicator size="large" color={colors.bg.primary} />
           ) : (
@@ -161,6 +216,7 @@ export default function WorkoutDurationScreen({ navigation }) {
                 thumbTintColor={colors.bg.primary}
                 onValueChange={handleValueChange}
                 onSlidingComplete={handleSlidingComplete}
+                disabled={isProcessing}
               />
               <View style={styles.marksRow}>
                 {marks.map((mark) => (
@@ -169,6 +225,12 @@ export default function WorkoutDurationScreen({ navigation }) {
                   </Text>
                 ))}
               </View>
+              {isProcessing && (
+                <ActivityIndicator size="small" color={colors.bg.primary} style={{ marginTop: 40 }} />
+              )}
+              {feedback ? (
+                <Text style={styles.feedback}>{feedback}</Text>
+              ) : null}
             </>
           )}
         </View>

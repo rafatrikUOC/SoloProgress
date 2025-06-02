@@ -14,6 +14,11 @@ import WorkoutDurationScreen from "../features/workout/screens/WorkoutDurationSc
 import AdvancedSettingsScreen from "../features/workout/screens/AdvancedSettingsScreen";
 import NewGymScreen from "../features/workout/screens/NewGymScreen";
 import RoutineLibraryScreen from "../features/workout/screens/RoutineLibraryScreen";
+import PlannedWorkoutsTestScreen from "../features/workout/screens/PlannedWorkoutsTestScreen";
+import WorkoutExerciseScreen from "../features/workout/screens/WorkoutExerciseScreen";
+import ReplaceExerciseScreen from "../features/workout/screens/ReplaceExerciseScreen";
+import AddExerciseScreen from "../features/workout/screens/AddExerciseScreen";
+import ActiveWorkoutScreen from "../features/workout/screens/ActiveWorkoutScreen";
 
 // Other features screens
 import ExerciseScreen from "../features/exercises/screens/ExerciseScreen";
@@ -27,6 +32,10 @@ export default function WorkoutStack() {
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="NextWorkout" component={NextWorkoutScreen} />
       <Stack.Screen name="NewGym" component={NewGymScreen} />
+      <Stack.Screen name="WorkoutExercise" component={WorkoutExerciseScreen} />
+      <Stack.Screen name="ReplaceExercise" component={ReplaceExerciseScreen} />
+      <Stack.Screen name="AddExercise" component={AddExerciseScreen} />
+      <Stack.Screen name="ActiveWorkout" component={ActiveWorkoutScreen} />
 
       {/* Plan configuration screens */}
       <Stack.Screen name="FitnessPlan" component={FitnessPlanScreen} />
@@ -41,6 +50,9 @@ export default function WorkoutStack() {
 
       {/* Other stack features screens */}
       <Stack.Screen name="Exercise" component={ExerciseScreen} />
+
+      {/* TODO: TESTING, PLEASE REMOVE */}
+      <Stack.Screen name="PlannedWorkoutsTest" component={PlannedWorkoutsTestScreen} />
     </Stack.Navigator>
   );
 }

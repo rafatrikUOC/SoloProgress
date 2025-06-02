@@ -7,12 +7,14 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { useThemeContext } from "../../../global/contexts/ThemeContext";
 import { BackButton, ScreenTitle } from "../../../global/components/UIElements";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { supabase } from "../../../global/services/supabaseService";
 import { UserContext } from "../../../global/contexts/UserContext";
+import { generateAndStorePlannedWorkouts } from "../services/plannedWorkoutService";
 
 const GOALS = [
   {
@@ -49,6 +51,8 @@ export default function FitnessGoalScreen({ navigation }) {
   const [infoVisible, setInfoVisible] = useState(false);
   const [currentDescription, setCurrentDescription] = useState("");
   const [currentFocus, setCurrentFocus] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [feedback, setFeedback] = useState("");
 
   useEffect(() => {
     if (user?.settings?.fitness_goal) {
@@ -56,7 +60,7 @@ export default function FitnessGoalScreen({ navigation }) {
     }
   }, [user]);
 
-  // Actualización optimista
+  // Optimistic update and also regenerate planned workouts if needed
   const handleSelect = async (goal) => {
     const prevSettings = { ...user.settings };
     setSelectedGoal(goal.label);
@@ -68,19 +72,50 @@ export default function FitnessGoalScreen({ navigation }) {
       },
     }));
 
+    setIsProcessing(true);
+    setFeedback("Updating workouts...");
+
     try {
       await supabase
         .from("UserSettings")
         .update({ fitness_goal: goal.label })
         .eq("user_id", user.info.id);
-      refreshUser();
+
+      await refreshUser();
+
+      // Get split and gymId from updated user context
+      const updatedUser = typeof user === "function" ? user() : user;
+      const split = updatedUser?.split || user?.split;
+      const gymId = updatedUser?.settings?.performance_data?.active_gym || user?.settings?.performance_data?.active_gym;
+      const workoutDuration =
+        updatedUser?.settings?.app_preferences?.workout_duration ||
+        user?.settings?.app_preferences?.workout_duration ||
+        60;
+
+      if (split && gymId) {
+        await generateAndStorePlannedWorkouts({
+          userId: user.info.id,
+          split,
+          gymId,
+          userGoal: goal.label,
+          workoutDuration,
+        });
+        setFeedback("Workouts updated!");
+      } else {
+        setFeedback("Could not update workouts (missing split or gym).");
+      }
     } catch {
-      // Revertir si falla
       setSelectedGoal(prevSettings.fitness_goal);
       setUser((prevUser) => ({
         ...prevUser,
         settings: prevSettings,
       }));
+      setFeedback("Failed to update workouts.");
+    } finally {
+      setTimeout(() => {
+        setIsProcessing(false);
+        setFeedback("");
+      }, 1200);
     }
   };
 
@@ -96,8 +131,22 @@ export default function FitnessGoalScreen({ navigation }) {
       backgroundColor: colors.body,
       padding: 24,
     },
+    infoBox: {
+      backgroundColor: colors.card,
+      borderRadius: 10,
+      padding: 14,
+      marginBottom: 32,
+      marginTop: 8,
+      borderLeftWidth: 4,
+      borderLeftColor: colors.bg.primary,
+    },
+    infoText: {
+      color: colors.text.muted,
+      fontSize: 15,
+      textAlign: "left",
+    },
     optionsContainer: {
-      marginTop: 36,
+      marginTop: 12,
       marginBottom: 32,
     },
     option: {
@@ -138,6 +187,12 @@ export default function FitnessGoalScreen({ navigation }) {
       borderRadius: 12,
       alignItems: "center",
     },
+    feedback: {
+      marginTop: 10,
+      fontSize: 16,
+      color: colors.text.primary,
+      textAlign: "center",
+    },
   });
 
   return (
@@ -145,6 +200,14 @@ export default function FitnessGoalScreen({ navigation }) {
       <BackButton onPress={() => navigation.goBack()} />
       <ScrollView showsVerticalScrollIndicator={false}>
         <ScreenTitle title="Fitness goal" />
+
+        {/* Info box about the effect of changing fitness goal */}
+        <View style={styles.infoBox}>
+          <Text style={styles.infoText}>
+            Changing your fitness goal will automatically regenerate your planned split workouts
+            (as long as you have a split and an active gym selected).
+          </Text>
+        </View>
 
         <View style={styles.optionsContainer}>
           {GOALS.map((goal) => (
@@ -156,6 +219,7 @@ export default function FitnessGoalScreen({ navigation }) {
                 selectedGoal === goal.label && styles.optionSelected,
               ]}
               activeOpacity={0.9}
+              disabled={isProcessing}
             >
               <View style={styles.optionRow}>
                 <Text
@@ -190,6 +254,13 @@ export default function FitnessGoalScreen({ navigation }) {
             </TouchableOpacity>
           ))}
         </View>
+
+        {isProcessing && (
+          <ActivityIndicator size="small" color={colors.bg.primary} style={{ marginTop: 10 }} />
+        )}
+        {feedback ? (
+          <Text style={styles.feedback}>{feedback}</Text>
+        ) : null}
       </ScrollView>
 
       {/* Info Modal */}

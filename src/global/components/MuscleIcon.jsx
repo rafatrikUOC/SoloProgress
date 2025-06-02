@@ -1,6 +1,6 @@
 import React from "react";
 
-// Import all muscle SVG components
+// All muscle SVG components
 import Abs from "../../../assets/muscles/Abs.svg";
 import Back from "../../../assets/muscles/Back.svg";
 import Biceps from "../../../assets/muscles/Biceps.svg";

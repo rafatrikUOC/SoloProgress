@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback, useContext } from "react";
 import {
   Text,
   StyleSheet,
@@ -10,19 +10,21 @@ import {
   View,
   Animated
 } from "react-native";
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useThemeContext } from "../../../global/contexts/ThemeContext";
 import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
 import { fetchExercises } from "../services/exerciseService";
 import { ExerciseCard } from "../components/ExerciseCard";
 import { ScreenTitle, ActionButton } from "../../../global/components/UIElements";
 import MuscleIcon from "../../../global/components/MuscleIcon";
+import { UserContext } from "../../../global/contexts/UserContext";
 
 const categories = ["Balance","Calisthenics","Cardio","Conditioning","Flexibility","Strength"];
 const muscles = ["Abs","Back","Biceps","Calves","Chest","Forearms","Hamstrings","Hips","Neck","Quadriceps","Shoulders","Thighs","Triceps"];
 
 export default function ExercisesScreen({ navigation, route }) {
   const { colors, typography } = useThemeContext();
+  const { user } = useContext(UserContext);
 
   const [loading, setLoading] = useState(true);
   const [exercises, setExercises] = useState([]);
@@ -38,7 +40,8 @@ export default function ExercisesScreen({ navigation, route }) {
   useEffect(() => {
     async function loadExercises() {
       setLoading(true);
-      const data = await fetchExercises();
+      let excluded = user?.settings?.performance_data?.excluded_exercises || [];
+      const data = await fetchExercises(excluded);
       setExercises(data);
       setLoading(false);
     }

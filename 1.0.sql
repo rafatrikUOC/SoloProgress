@@ -39,6 +39,20 @@ CREATE TABLE "UserSettings" (
 );
 COMMENT ON TABLE "UserSettings" IS 'User-specific configuration settings (units, goals, app preferences, etc.), stored in JSONB format for flexibility.';
 
+CREATE TABLE "UserPlannedWorkouts" (
+  id SERIAL PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES "Users"(id) ON DELETE CASCADE,
+  split_id INT NOT NULL REFERENCES "TrainingSplits"(id) ON DELETE CASCADE,
+  session_index INT NOT NULL,         -- Index of the session within the split (e.g., 0 = first session)
+  title TEXT NOT NULL,                -- Title of the session (e.g., "Push", "Pull", "Legs")
+  exercises JSONB NOT NULL,           -- List of recommended exercises for this session (array of exercise IDs or objects)
+  created_at TIMESTAMP DEFAULT NOW(), -- Creation timestamp
+  updated_at TIMESTAMP DEFAULT NOW()  -- Last update timestamp
+);
+ALTER TABLE "UserPlannedWorkouts" ADD CONSTRAINT unique_user_split_session UNIQUE (user_id, split_id, session_index);
+ALTER TABLE "UserPlannedWorkouts" ADD COLUMN IF NOT EXISTS details JSONB DEFAULT NULL;
+COMMENT ON TABLE "UserPlannedWorkouts" IS 'Stores the planned workouts for each user and split, including recommended exercises for each session.';
+
 CREATE TABLE "Measurements" (
 	id SERIAL PRIMARY KEY,
 	user_id UUID NOT NULL REFERENCES "Users"(id) ON DELETE CASCADE,
@@ -143,15 +157,17 @@ CREATE TABLE "RoutineSteps" (
 	is_active BOOLEAN DEFAULT TRUE,  -- Flag to indicate whether this step is currently active in the routine
 	performance_data JSONB DEFAULT NULL,  -- Stores additional data like notes, feedback, performance metrics, etc.
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP  -- Timestamp when the routine step was created
-);
+);  
 COMMENT ON TABLE "RoutineSteps" IS 'Steps within a routine, including exercises, rest periods, or other custom actions. Performance data is stored in JSONB format.';
 
 CREATE TABLE "TrainingSessions" (
 	id SERIAL PRIMARY KEY,
 	user_id UUID NOT NULL REFERENCES "Users"(id) ON DELETE CASCADE,
-	routine_id INTEGER NOT NULL REFERENCES "Routines"(id) ON DELETE CASCADE,
+	routine_id INTEGER REFERENCES "Routines"(id) ON DELETE CASCADE,
 	punctual_id INTEGER REFERENCES "PuntualRoutines"(id) ON DELETE SET NULL,
 	session_id INTEGER REFERENCES "RoutineSessions"(id) ON DELETE SET NULL,
+	split_id INT REFERENCES "TrainingSplits"(id) ON DELETE SET NULL,
+	session_index INT DEFAULT NULL, -- Index of the session within the split (e.g., 0 = first session)
 	start_time TIMESTAMP, -- Start time of the training session
 	end_time TIMESTAMP, -- End time of the training session
 	volume FLOAT DEFAULT NULL,  -- Total volume of the session (for example, total weight lifted), default to NULL
@@ -161,7 +177,9 @@ CREATE TABLE "TrainingSessions" (
 	performance_data JSONB DEFAULT NULL,  -- Stores additional data such as notes, feedback, or session-related metrics
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP  -- Timestamp when the training session was created
 );
-COMMENT ON TABLE "TrainingSessions" IS 'Training sessions performed by users, logging workout stats and notes. Additional session data is stored in JSONB format.';
+ALTER TABLE "TrainingSessions" ADD COLUMN IF NOT EXISTS split_id INT REFERENCES "TrainingSplits"(id) ON DELETE SET NULL;
+ALTER TABLE "TrainingSessions" ADD COLUMN IF NOT EXISTS session_index INT DEFAULT NULL;
+COMMENT ON TABLE "TrainingSessions" IS 'Training sessions performed by users, logging workout stats and notes.';
 
 CREATE TABLE "TrainingExercises" (
 	id SERIAL PRIMARY KEY, -- Unique identifier for each training exercise
@@ -170,10 +188,9 @@ CREATE TABLE "TrainingExercises" (
 	volume FLOAT DEFAULT NULL,  -- Volume of the exercise (weight lifted * repetitions), default to NULL
 	one_rep_max FLOAT DEFAULT NULL,  -- One-rep max for the exercise (if applicable), default to NULL
 	performance_data JSONB DEFAULT NULL,  -- Stores additional details like comments, feedback, performance notes
-	timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP  -- Timestamp when the training exercise was performed
+	timestamp TIMESTAMP DEFAULT NULL  -- Timestamp when the training exercise was performed
 );
 COMMENT ON TABLE "TrainingExercises" IS 'Exercises performed during a training session, recording volume, one-rep max, and other details in JSONB format.';
-
 
 CREATE TABLE "ExerciseSeries" (
 	training_exercise_id INTEGER NOT NULL REFERENCES "TrainingExercises"(id) ON DELETE CASCADE, -- Reference to the training exercise
@@ -188,7 +205,6 @@ CREATE TABLE "ExerciseSeries" (
 	PRIMARY KEY (training_exercise_id, "order", is_warmup)
 );
 COMMENT ON TABLE "ExerciseSeries" IS 'Sets (warm-up or working) performed during an exercise in a training session, with additional performance data stored in JSONB format.';
-
 
 CREATE TABLE "Imports" (
 	id SERIAL PRIMARY KEY, 
@@ -277,7 +293,7 @@ CREATE INDEX idx_imports_processed_at ON "Imports" (processed_at);
 -- EXERCISES DATA
 -- ====================
 
--- CHEST
+-- ABS
 INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
 VALUES
 ('Crunch', '[
@@ -319,6 +335,201 @@ VALUES
   "Continue alternating legs at a fast pace, as if running in place.",
   "Keep your hips low and maintain a steady rhythm."
 ]', 'Abs', '["Shoulders", "Cardio"]', '[]', '[]', '[]', '["cardio", "calisthenics"]', false);
+INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
+VALUES
+
+('Sit-up', '[
+  "Lie on your back with knees bent and feet flat on the floor.",
+  "Cross your arms over your chest or place hands behind your head (without pulling on your neck).",
+  "Engage your core and lift your torso up toward your knees.",
+  "Pause at the top, then slowly lower back down."
+]', 'Abs', '["Hip flexors"]', '[]', '[]', '[]', '["strength", "calisthenics"]', false),
+
+('Decline Sit-up', '[
+  "Set a decline bench to your desired angle.",
+  "Lie back, hook your feet under the pads, and cross your arms over your chest.",
+  "Engage your abs and sit up until your torso is upright.",
+  "Lower yourself back down slowly."
+]', 'Abs', '["Hip flexors"]', '["Decline bench"]', '[]', '[]', '["strength"]', false),
+
+('Russian Twist', '[
+  "Sit on the floor with knees bent and feet flat.",
+  "Lean back slightly and lift your feet off the floor.",
+  "Hold your hands together or a weight in front of you.",
+  "Twist your torso to the right, then to the left, rotating from your waist."
+]', 'Abs', '["Obliques"]', '[]', '[]', '[]', '["strength", "calisthenics"]', false),
+
+('Weighted Russian Twist', '[
+  "Sit on the floor with knees bent, holding a dumbbell or medicine ball.",
+  "Lean back slightly, lift your feet, and twist your torso side to side."
+]', 'Abs', '["Obliques"]', '["Dumbbells", "Medicine ball"]', '[]', '[]', '["strength"]', false),
+
+('Hanging Knee Raise', '[
+  "Hang from a pull-up bar with arms extended.",
+  "Engage your core and raise your knees toward your chest.",
+  "Pause, then lower with control."
+]', 'Abs', '["Hip flexors"]', '["Pull-up bar"]', '[]', '[]', '["strength", "calisthenics"]', false),
+
+('Toes to Bar', '[
+  "Hang from a pull-up bar with arms extended.",
+  "Engage your core and swing your legs up, aiming to touch your toes to the bar.",
+  "Lower with control."
+]', 'Abs', '["Hip flexors"]', '["Pull-up bar"]', '[]', '[]', '["strength", "calisthenics"]', false),
+
+('Ab Wheel Rollout', '[
+  "Kneel on the floor with an ab roller in your hands.",
+  "Roll the wheel forward, keeping your core tight and back straight.",
+  "Go as far as you can without arching your back, then roll back to start."
+]', 'Abs', '["Lower back", "Shoulders"]', '["Ab roller"]', '[]', '[]', '["strength"]', false),
+
+('Stability Ball Crunch', '[
+  "Sit on a stability ball and walk your feet forward until your lower back rests on the ball.",
+  "Cross your arms over your chest or place hands behind your head.",
+  "Crunch up, lifting your shoulders off the ball, then lower back down."
+]', 'Abs', '[]', '["Balance ball (stability ball)"]', '[]', '[]', '["strength"]', false),
+
+('Reverse Crunch', '[
+  "Lie on your back with arms at your sides and legs bent at 90 degrees.",
+  "Lift your hips off the floor, curling your knees toward your chest.",
+  "Lower slowly back to the starting position."
+]', 'Abs', '[]', '[]', '[]', '[]', '["strength", "calisthenics"]', false),
+
+('Bicycle Crunch', '[
+  "Lie on your back with hands behind your head and legs lifted, knees bent.",
+  "Bring your right elbow toward your left knee while extending your right leg.",
+  "Switch sides in a pedaling motion."
+]', 'Abs', '["Obliques"]', '[]', '[]', '[]', '["strength", "calisthenics"]', false),
+
+('V-Up', '[
+  "Lie flat on your back with arms extended overhead.",
+  "Simultaneously lift your legs and upper body, reaching your hands toward your feet.",
+  "Lower back down with control."
+]', 'Abs', '["Hip flexors"]', '[]', '[]', '[]', '["strength", "calisthenics"]', false),
+
+('Jackknife Sit-up', '[
+  "Lie on your back with arms overhead and legs straight.",
+  "Lift your arms and legs together, aiming to touch your toes.",
+  "Lower back down."
+]', 'Abs', '["Hip flexors"]', '[]', '[]', '[]', '["strength", "calisthenics"]', false),
+
+('Medicine Ball Slam', '[
+  "Stand with feet shoulder-width apart, holding a medicine ball overhead.",
+  "Engage your core and slam the ball down to the floor as hard as possible.",
+  "Catch the ball on the bounce and repeat."
+]', 'Abs', '["Shoulders", "Cardio"]', '["Medicine ball"]', '[]', '[]', '["cardio", "strength"]', false),
+
+('Standing Cable Woodchopper', '[
+  "Attach a handle to a high pulley on a cable machine.",
+  "Stand sideways to the machine, feet shoulder-width apart.",
+  "Grasp the handle with both hands and pull it diagonally across your body to your opposite hip.",
+  "Rotate your torso and hips as you pull."
+]', 'Abs', '["Obliques", "Shoulders"]', '["Cable machine"]', '[]', '[]', '["strength"]', false),
+
+('Decline Bench Leg Raise', '[
+  "Lie on a decline bench, gripping the bench behind your head.",
+  "Keep your legs straight and lift them up toward the ceiling.",
+  "Lower with control."
+]', 'Abs', '["Hip flexors"]', '["Decline bench"]', '[]', '[]', '["strength"]', false),
+
+('Plank with Shoulder Tap', '[
+  "Start in a high plank position.",
+  "Tap your left shoulder with your right hand, then your right shoulder with your left hand.",
+  "Keep your hips steady throughout."
+]', 'Abs', '["Shoulders"]', '[]', '[]', '[]', '["strength", "calisthenics"]', false),
+
+('TRX Pike', '[
+  "Place your feet in the TRX straps and get into a push-up position.",
+  "Engage your core and lift your hips toward the ceiling, forming an inverted V.",
+  "Return to start."
+]', 'Abs', '["Shoulders", "Hip flexors"]', '["Trx / suspension trainer"]', '[]', '[]', '["strength"]', false),
+
+('Weighted Sit-up', '[
+  "Lie on your back holding a weight plate or dumbbell at your chest.",
+  "Perform a sit-up, keeping the weight close to your body.",
+  "Lower back down."
+]', 'Abs', '["Hip flexors"]', '["Dumbbells", "Weight plates"]', '[]', '[]', '["strength"]', false),
+
+('Landmine Twist', '[
+  "Place one end of a barbell into a landmine attachment.",
+  "Hold the other end with both hands, arms extended.",
+  "Rotate the barbell from side to side, pivoting your feet and engaging your core."
+]', 'Abs', '["Obliques", "Shoulders"]', '["Landmine attachment", "Barbell"]', '[]', '[]', '["strength"]', false),
+
+('Farmer''s Carry', '[
+  "Hold a heavy dumbbell or kettlebell in each hand at your sides.",
+  "Walk forward, keeping your core tight and shoulders back.",
+  "Maintain good posture throughout."
+]', 'Abs', '["Forearms", "Shoulders"]', '["Dumbbells", "Kettlebells"]', '[]', '[]', '["strength", "functional"]', true),
+
+('Dead Bug', '[
+  "Lie on your back with arms extended toward the ceiling and knees bent at 90 degrees.",
+  "Lower your right arm and left leg toward the floor while keeping your back flat.",
+  "Return to start and repeat on the other side."
+]', 'Abs', '["Lower back"]', '[]', '[]', '[]', '["strength", "calisthenics"]', false),
+
+('Standing Oblique Crunch', '[
+  "Stand with feet shoulder-width apart, hands behind your head.",
+  "Lift your right knee toward your right elbow, crunching your side.",
+  "Return to start and repeat on the left."
+]', 'Abs', '["Obliques"]', '[]', '[]', '[]', '["strength", "calisthenics"]', false),
+
+('Side Plank', '[
+  "Lie on your side and prop yourself up on your forearm.",
+  "Lift your hips so your body forms a straight line from head to feet.",
+  "Hold this position, keeping your core engaged."
+]', 'Abs', '["Obliques", "Shoulders"]', '[]', '[]', '[]', '["strength", "calisthenics"]', false),
+
+('Weighted Side Bend', '[
+  "Stand with feet shoulder-width apart, holding a dumbbell in one hand.",
+  "Bend sideways at the waist, lowering the dumbbell toward the floor.",
+  "Return to start and repeat on the other side."
+]', 'Abs', '["Obliques"]', '["Dumbbells"]', '[]', '[]', '["strength"]', false),
+
+('GHD Sit-up', '[
+  "Sit on a glute ham developer (GHD) with feet secured.",
+  "Lower your torso back until parallel to the floor.",
+  "Engage your abs to sit up to the starting position."
+]', 'Abs', '["Hip flexors"]', '["Glute ham developer (ghd)"]', '[]', '[]', '["strength"]', false),
+
+('Flutter Kicks', '[
+  "Lie on your back with legs extended and hands under your hips.",
+  "Lift your legs off the ground and alternate kicking them up and down.",
+  "Keep your core tight throughout."
+]', 'Abs', '["Hip flexors"]', '[]', '[]', '[]', '["strength", "calisthenics"]', false),
+
+('Seated Knee Tuck', '[
+  "Sit on the edge of a bench or mat with hands behind you for support.",
+  "Lean back slightly and extend your legs.",
+  "Pull your knees toward your chest, then extend them back out."
+]', 'Abs', '["Hip flexors"]', '["Flat bench"]', '[]', '[]', '["strength", "calisthenics"]', false),
+
+('Medicine Ball Russian Twist', '[
+  "Sit on the floor with knees bent, holding a medicine ball.",
+  "Lean back slightly, lift your feet, and twist your torso side to side."
+]', 'Abs', '["Obliques"]', '["Medicine ball"]', '[]', '[]', '["strength"]', false),
+
+('Cable Rope Overhead Crunch', '[
+  "Attach a rope to the low pulley of a cable machine.",
+  "Kneel facing away from the machine, holding the rope overhead.",
+  "Crunch forward, bringing your elbows toward your knees."
+]', 'Abs', '["Obliques"]', '["Cable machine"]', '[]', '[]', '["strength"]', false),
+
+('Standing Resistance Band Crunch', '[
+  "Anchor a resistance band above head height.",
+  "Face away, hold the band behind your neck, and crunch forward.",
+  "Return to start."
+]', 'Abs', '[]', '["Resistance bands"]', '[]', '[]', '["strength"]', false),
+
+('Bosu Ball Plank', '[
+  "Place your forearms on a Bosu ball and extend your legs behind you.",
+  "Hold a plank position, keeping your body in a straight line."
+]', 'Abs', '["Shoulders"]', '["Bosu ball"]', '[]', '[]', '["strength"]', false),
+
+('Standing Landmine Oblique Twist', '[
+  "Place one end of a barbell in a landmine attachment.",
+  "Hold the other end with both hands, arms extended.",
+  "Rotate the barbell from hip to hip, engaging your obliques."
+]', 'Abs', '["Obliques"]', '["Landmine attachment", "Barbell"]', '[]', '[]', '["strength"]', false);
 
 -- BACK
 INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
@@ -363,6 +574,137 @@ VALUES
   "Repeat for the desired number of reps."
 ]', 'Back', '["Glutes", "Shoulders"]', '[]', '[]', '[]', '["calisthenics", "flexibility"]', false);
 
+INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
+VALUES
+
+('Chin-Up', '[
+  "Grasp a pull-up bar with an underhand grip, hands shoulder-width apart.",
+  "Hang with arms fully extended and feet off the ground.",
+  "Pull your chin above the bar by driving your elbows down and back.",
+  "Lower yourself slowly to the starting position."
+]', 'Back', '["Biceps", "Forearms"]', '["Pull-up bar"]', '[]', '[]', '["strength", "calisthenics"]', true),
+
+('Single Arm Dumbbell Row', '[
+  "Place your left knee and hand on a flat bench, holding a dumbbell in your right hand.",
+  "Keep your back flat and pull the dumbbell toward your hip, squeezing your back.",
+  "Lower the dumbbell with control. Repeat on the other side."
+]', 'Back', '["Biceps"]', '["Flat bench", "Dumbbells"]', '[]', '[]', '["strength"]', true),
+
+('T-Bar Row', '[
+  "Load a T-bar row machine or use a barbell in a landmine attachment.",
+  "Straddle the bar, grasp the handles, and hinge at the hips.",
+  "Pull the bar toward your chest, squeezing your shoulder blades together.",
+  "Lower with control."
+]', 'Back', '["Biceps", "Rear delts"]', '["T-bar row machine"]', '[]', '[]', '["strength"]', true),
+
+('Inverted Row', '[
+  "Set a barbell in a power rack or use a suspension trainer at waist height.",
+  "Lie underneath, grasp the bar with an overhand grip.",
+  "Keep your body straight and pull your chest to the bar.",
+  "Lower yourself back down."
+]', 'Back', '["Biceps", "Shoulders"]', '["Power rack"]', '[]', '[]', '["strength", "calisthenics"]', true),
+
+('Dumbbell Pullover', '[
+  "Lie on a flat bench with a dumbbell held above your chest, arms straight.",
+  "Lower the dumbbell behind your head in an arc, keeping arms slightly bent.",
+  "Pull the dumbbell back to the starting position."
+]', 'Back', '["Chest", "Shoulders"]', '["Flat bench", "Dumbbells"]', '[]', '[]', '["strength"]', false),
+
+('Pendlay Row', '[
+  "Set up as for a bent over barbell row, but let the bar rest on the floor between reps.",
+  "Pull the bar explosively to your lower chest, then return it to the floor each rep."
+]', 'Back', '["Biceps", "Lower back"]', '["Barbell"]', '[]', '[]', '["strength"]', true),
+
+('Seated Row Machine', '[
+  "Sit at a seated row machine and grasp the handles.",
+  "Pull the handles toward your torso, squeezing your shoulder blades together.",
+  "Slowly return to the starting position."
+]', 'Back', '["Biceps", "Rear delts"]', '["Seated row machine"]', '[]', '[]', '["strength"]', true),
+
+('Face Pull', '[
+  "Attach a rope to a cable machine at upper chest height.",
+  "Grasp the rope with both hands, palms facing in.",
+  "Pull the rope toward your face, keeping elbows high and squeezing your upper back.",
+  "Return with control."
+]', 'Back', '["Rear delts", "Shoulders"]', '["Cable machine"]', '[]', '[]', '["strength"]', false),
+
+('Reverse Fly', '[
+  "Sit on the edge of a flat bench or stand bent over, holding dumbbells at your sides.",
+  "With a slight bend in your elbows, raise the weights out to your sides until your arms are parallel to the floor.",
+  "Lower with control."
+]', 'Back', '["Rear delts", "Shoulders"]', '["Flat bench", "Dumbbells"]', '[]', '[]', '["strength"]', false),
+
+('Chest Supported Row', '[
+  "Set an incline bench to 30-45 degrees and lie face down with a dumbbell in each hand.",
+  "Let your arms hang straight down, then row the dumbbells up toward your hips.",
+  "Lower with control."
+]', 'Back', '["Biceps", "Rear delts"]', '["Incline bench", "Dumbbells"]', '[]', '[]', '["strength"]', true),
+
+('Smith Machine Row', '[
+  "Set the bar on a Smith machine to mid-shin height.",
+  "Bend at the hips, grasp the bar, and row it to your lower chest.",
+  "Lower with control."
+]', 'Back', '["Biceps", "Lower back"]', '["Smith machine"]', '[]', '[]', '["strength"]', true),
+
+('Landmine Row', '[
+  "Place one end of a barbell in a landmine attachment.",
+  "Straddle the bar, grasp the end with both hands or a V-handle.",
+  "Row the bar toward your chest, squeezing your back.",
+  "Lower with control."
+]', 'Back', '["Biceps", "Rear delts"]', '["Landmine attachment", "Barbell"]', '[]', '[]', '["strength"]', true),
+
+('Wide Grip Pull-Up', '[
+  "Grasp a pull-up bar with a wide overhand grip.",
+  "Hang with arms fully extended.",
+  "Pull your chest up toward the bar, focusing on your lats.",
+  "Lower yourself slowly."
+]', 'Back', '["Biceps"]', '["Pull-up bar"]', '[]', '[]', '["strength", "calisthenics"]', true),
+
+('Close Grip Lat Pulldown', '[
+  "Sit at a lat pulldown machine and grasp a close grip handle.",
+  "Pull the handle down to your chest, keeping elbows close to your body.",
+  "Slowly release."
+]', 'Back', '["Biceps"]', '["Lat pulldown machine"]', '[]', '[]', '["strength"]', true),
+
+('Good Morning', '[
+  "Stand with a barbell on your upper back, feet shoulder-width apart.",
+  "Hinge at your hips, keeping your back straight, until your torso is nearly parallel to the floor.",
+  "Return to standing."
+]', 'Back', '["Hamstrings", "Glutes"]', '["Barbell"]', '[]', '[]', '["strength"]', true),
+
+('Reverse Hyperextension', '[
+  "Lie face down on a glute ham developer (GHD) with your hips at the edge.",
+  "Hold the handles and lift your legs up behind you until your body is straight.",
+  "Lower with control."
+]', 'Back', '["Glutes", "Hamstrings"]', '["Glute ham developer (ghd)"]', '[]', '[]', '["strength"]', false),
+
+('Resistance Band Pull-Apart', '[
+  "Hold a resistance band at shoulder height with both hands.",
+  "Pull the band apart by moving your hands outward, squeezing your shoulder blades together.",
+  "Return with control."
+]', 'Back', '["Rear delts", "Shoulders"]', '["Resistance bands"]', '[]', '[]', '["strength"]', false),
+
+('TRX Row', '[
+  "Hold the handles of a TRX or suspension trainer and lean back with arms extended.",
+  "Pull your chest toward your hands, keeping your body straight.",
+  "Lower with control."
+]', 'Back', '["Biceps", "Shoulders"]', '["Trx / suspension trainer"]', '[]', '[]', '["strength", "calisthenics"]', true),
+
+('Renegade Row', '[
+  "Start in a push-up position with a dumbbell in each hand.",
+  "Row one dumbbell toward your hip while stabilizing your body.",
+  "Lower and repeat on the other side."
+]', 'Back', '["Biceps", "Core"]', '["Dumbbells"]', '[]', '[]', '["strength"]', true),
+
+('Kettlebell Swing', '[
+  "Stand with feet shoulder-width apart, holding a kettlebell with both hands.",
+  "Hinge at your hips and swing the kettlebell between your legs.",
+  "Thrust your hips forward to swing the kettlebell up to chest height.",
+  "Let it swing back down and repeat."
+]', 'Back', '["Glutes", "Hamstrings"]', '["Kettlebells"]', '[]', '[]', '["strength", "cardio"]', true);
+
+
+
 -- BICEPS
 INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
 VALUES
@@ -386,22 +728,105 @@ VALUES
   "Curl the dumbbell up toward your shoulder, keeping your upper arm stationary.",
   "Pause and squeeze your biceps at the top.",
   "Lower the dumbbell back to the starting position."
-]', 'Biceps', '[]', '["Dumbbell"]', '[]', '[]', '["strength"]', false),
+]', 'Biceps', '[]', '["Dumbbells"]', '[]', '[]', '["strength"]', false),
 
 ('Cable Curl', '[
   "Stand facing a low cable machine with a straight bar attachment.",
   "Grasp the bar with an underhand grip, arms extended.",
   "Curl the bar toward your shoulders by flexing your elbows.",
   "Pause at the top, then slowly lower the bar back to the starting position."
-]', 'Biceps', '[]', '["Cable machine"]', '[]', '[]', '["strength"]', false),
+]', 'Biceps', '[]', '["Cable machine"]', '[]', '[]', '["strength"]', false);
 
-('Chin-Up', '[
-  "Grasp a pull-up bar with an underhand grip, hands shoulder-width apart.",
-  "Hang at arm''s length with your arms fully extended and feet off the ground.",
-  "Pull your chest up toward the bar by driving your elbows down and back.",
-  "Pause when your chin is above the bar.",
-  "Lower yourself slowly back to the starting position."
-]', 'Biceps', '["Back", "Forearms"]', '["Pull-up bar"]', '[]', '[]', '["strength", "calisthenics"]', true);
+INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
+VALUES
+
+('EZ Bar Curl', '[
+  "Stand upright holding an EZ curl bar with an underhand grip.",
+  "Keep your elbows close to your sides and curl the bar up toward your shoulders.",
+  "Pause at the top, then slowly lower the bar back to the starting position."
+]', 'Biceps', '["Forearms"]', '["Ez curl bar"]', '[]', '[]', '["strength"]', false),
+
+('Incline Dumbbell Curl', '[
+  "Sit back on an incline bench with a dumbbell in each hand, arms hanging straight down.",
+  "Curl the dumbbells up while keeping your upper arms stationary.",
+  "Pause at the top, then lower with control."
+]', 'Biceps', '[]', '["Incline bench", "Dumbbells"]', '[]', '[]', '["strength"]', false),
+
+('Preacher Curl', '[
+  "Sit at a preacher curl bench and grasp a barbell or EZ curl bar with an underhand grip.",
+  "Rest your upper arms on the pad and curl the bar toward your shoulders.",
+  "Pause, then lower the bar back to the starting position."
+]', 'Biceps', '[]', '["Preacher curl bench", "Barbell"]', '[]', '[]', '["strength"]', false),
+
+('Dumbbell Curl', '[
+  "Stand with a dumbbell in each hand, arms fully extended at your sides.",
+  "Curl the weights up toward your shoulders, rotating your wrists so your palms face up.",
+  "Lower the weights back to the starting position."
+]', 'Biceps', '["Forearms"]', '["Dumbbells"]', '[]', '[]', '["strength"]', false),
+
+('Reverse Curl', '[
+  "Stand holding a barbell with an overhand grip, hands shoulder-width apart.",
+  "Curl the bar up toward your shoulders, keeping your elbows close to your body.",
+  "Pause at the top, then lower the bar back to the starting position."
+]', 'Biceps', '["Forearms"]', '["Barbell"]', '[]', '[]', '["strength"]', false),
+
+('Spider Curl', '[
+  "Lie face down on an incline bench, holding dumbbells with arms hanging straight down.",
+  "Curl the dumbbells up, squeezing your biceps at the top.",
+  "Lower with control."
+]', 'Biceps', '[]', '["Incline bench", "Dumbbells"]', '[]', '[]', '["strength"]', false),
+
+('Seated Dumbbell Curl', '[
+  "Sit on a flat bench with a dumbbell in each hand, arms at your sides.",
+  "Curl the weights up toward your shoulders, then lower back down."
+]', 'Biceps', '[]', '["Flat bench", "Dumbbells"]', '[]', '[]', '["strength"]', false),
+
+('Cable Hammer Curl (Rope Attachment)', '[
+  "Attach a rope to the low pulley of a cable machine.",
+  "Hold the rope with a neutral grip (palms facing each other).",
+  "Curl the rope up toward your shoulders, then lower with control."
+]', 'Biceps', '["Forearms"]', '["Cable machine"]', '[]', '[]', '["strength"]', false),
+
+('Zottman Curl', '[
+  "Stand holding dumbbells at your sides, palms facing forward.",
+  "Curl the weights up, then rotate your wrists so your palms face down at the top.",
+  "Lower the weights with palms down, then rotate back to start."
+]', 'Biceps', '["Forearms"]', '["Dumbbells"]', '[]', '[]', '["strength"]', false),
+
+('Resistance Band Curl', '[
+  "Stand on a resistance band and grasp the handles with an underhand grip.",
+  "Curl the handles up toward your shoulders, then lower with control."
+]', 'Biceps', '[]', '["Resistance bands"]', '[]', '[]', '["strength"]', false),
+
+('TRX Biceps Curl', '[
+  "Hold the handles of a TRX or suspension trainer with palms facing up.",
+  "Lean back and extend your arms.",
+  "Curl your body toward your hands by flexing your elbows, keeping upper arms parallel to the floor.",
+  "Lower yourself back to the starting position."
+]', 'Biceps', '["Forearms"]', '["Trx / suspension trainer"]', '[]', '[]', '["strength", "calisthenics"]', false),
+
+('Machine Biceps Curl', '[
+  "Sit at a biceps curl machine and grasp the handles.",
+  "Curl the handles toward your shoulders, then lower with control."
+]', 'Biceps', '[]', '["Chest press machine"]', '[]', '[]', '["strength"]', false),
+
+('Kettlebell Curl', '[
+  "Stand holding a kettlebell in each hand, arms at your sides.",
+  "Curl the kettlebells up toward your shoulders, then lower back down."
+]', 'Biceps', '["Forearms"]', '["Kettlebells"]', '[]', '[]', '["strength"]', false),
+
+('Resistance Band Hammer Curl', '[
+  "Stand on a resistance band and hold the handles with a neutral grip.",
+  "Curl the handles up, keeping your palms facing each other.",
+  "Lower with control."
+]', 'Biceps', '["Forearms"]', '["Resistance bands"]', '[]', '[]', '["strength"]', false),
+
+('Cross-Body Hammer Curl', '[
+  "Stand with a dumbbell in each hand, arms at your sides.",
+  "Curl one dumbbell across your body toward the opposite shoulder.",
+  "Lower and repeat on the other side."
+]', 'Biceps', '["Forearms"]', '["Dumbbells"]', '[]', '[]', '["strength"]', false);
+
 
 -- CALVES
 INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
@@ -442,6 +867,58 @@ VALUES
   "Pause and squeeze your calves at the top.",
   "Lower your heels back down slowly."
 ]', 'Calves', '[]', '["Leg press machine"]', '[]', '[]', '["strength"]', false);
+
+INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
+VALUES
+
+('Smith Machine Calf Raise', '[
+  "Stand upright under a Smith machine bar, resting the bar across your upper back.",
+  "Place the balls of your feet on an elevated platform or weight plate.",
+  "Raise your heels as high as possible, squeezing your calves at the top.",
+  "Lower your heels back down slowly."
+]', 'Calves', '[]', '["Smith machine"]', '[]', '[]', '["strength"]', false),
+
+('Dumbbell Calf Raise', '[
+  "Hold a dumbbell in each hand at your sides.",
+  "Stand upright with feet shoulder-width apart.",
+  "Raise your heels as high as possible, squeezing your calves.",
+  "Lower your heels back down slowly."
+]', 'Calves', '[]', '["Dumbbells"]', '[]', '[]', '["strength"]', false),
+
+('Barbell Calf Raise', '[
+  "Stand upright with a barbell resting across your upper back.",
+  "Place the balls of your feet on an elevated surface.",
+  "Raise your heels as high as possible, squeezing your calves.",
+  "Lower your heels back down slowly."
+]', 'Calves', '[]', '["Barbell"]', '[]', '[]', '["strength"]', false),
+
+('Seated Dumbbell Calf Raise', '[
+  "Sit on a flat bench and place a dumbbell across your knees.",
+  "Place the balls of your feet on an elevated surface.",
+  "Raise your heels as high as possible, squeezing your calves.",
+  "Lower your heels back down slowly."
+]', 'Calves', '[]', '["Flat bench", "Dumbbells"]', '[]', '[]', '["strength"]', false),
+
+('Standing Resistance Band Calf Raise', '[
+  "Stand on a resistance band with the ends held in your hands.",
+  "Raise your heels as high as possible, stretching the band.",
+  "Lower your heels back down slowly."
+]', 'Calves', '[]', '["Resistance bands"]', '[]', '[]', '["strength"]', false),
+
+('Kettlebell Calf Raise', '[
+  "Hold a kettlebell in each hand at your sides.",
+  "Stand upright with feet shoulder-width apart.",
+  "Raise your heels as high as possible, squeezing your calves.",
+  "Lower your heels back down slowly."
+]', 'Calves', '[]', '["Kettlebells"]', '[]', '[]', '["strength"]', false),
+
+('Standing Calf Raise on Bosu Ball', '[
+  "Stand with both feet on a Bosu ball, flat side down.",
+  "Raise your heels as high as possible, squeezing your calves.",
+  "Lower your heels back down slowly."
+]', 'Calves', '[]', '["Bosu ball"]', '[]', '[]', '["strength", "balance"]', false);
+
+
 
 -- CARDIO
 INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
@@ -488,6 +965,97 @@ VALUES
   "Continue for the desired duration."
 ]', 'Cardio', '["Legs"]', '["Stationary bike"]', '[]', '[]', '["cardio"]', false);
 
+INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
+VALUES
+('Treadmill Walking', '[
+  "Step onto the treadmill and select a comfortable walking speed.",
+  "Walk with an upright posture, swinging your arms naturally.",
+  "Increase the incline for added intensity if desired.",
+  "Continue for the desired duration."
+]', 'Cardio', '["Legs"]', '["Treadmill"]', '[]', '[]', '["cardio"]', false),
+
+('Treadmill Running', '[
+  "Set the treadmill to a running speed.",
+  "Run with a natural stride and relaxed shoulders.",
+  "Maintain a steady pace and breathing.",
+  "Cool down by gradually reducing speed."
+]', 'Cardio', '["Legs"]', '["Treadmill"]', '[]', '[]', '["cardio"]', false),
+
+('Stationary Bike Ride', '[
+  "Adjust the seat and handlebars of the stationary bike.",
+  "Begin pedaling at a comfortable pace.",
+  "Increase resistance for added intensity.",
+  "Maintain good posture throughout the ride."
+]', 'Cardio', '["Legs"]', '["Stationary bike"]', '[]', '[]', '["cardio"]', false),
+
+('Spin Bike Intervals', '[
+  "Set up the spin bike and warm up at an easy pace.",
+  "Alternate between periods of high-intensity sprints and recovery pedaling.",
+  "Adjust resistance as needed.",
+  "Cool down at a low intensity."
+]', 'Cardio', '["Legs"]', '["Spin bike"]', '[]', '[]', '["cardio"]', false),
+
+('Elliptical Trainer', '[
+  "Step onto the elliptical and grasp the handles.",
+  "Move your arms and legs in a smooth, coordinated motion.",
+  "Adjust resistance and incline as desired.",
+  "Maintain a steady pace for the desired duration."
+]', 'Cardio', '["Legs", "Arms"]', '["Elliptical"]', '[]', '[]', '["cardio"]', false),
+
+('Stair Climber', '[
+  "Step onto the stair climber and hold the handles lightly.",
+  "Begin stepping, keeping your back straight and core engaged.",
+  "Adjust speed or resistance for intensity.",
+  "Continue for the desired duration."
+]', 'Cardio', '["Legs", "Glutes"]', '["Stair climber"]', '[]', '[]', '["cardio"]', false),
+
+('Air Bike (Assault Bike)', '[
+  "Sit on the air bike and grasp the handles.",
+  "Begin pedaling and push/pull the handles simultaneously.",
+  "Increase intensity as desired.",
+  "Continue for the desired duration."
+]', 'Cardio', '["Legs", "Arms"]', '["Air bike (assault bike)"]', '[]', '[]', '["cardio"]', true),
+
+('Skierg', '[
+  "Stand facing the Skierg machine and grasp the handles.",
+  "Pull the handles down in a powerful motion, bending your knees and hinging at the hips.",
+  "Return to the starting position and repeat.",
+  "Maintain a steady rhythm."
+]', 'Cardio', '["Back", "Arms", "Core"]', '["Skierg"]', '[]', '[]', '["cardio"]', true),
+
+('Outdoor Running', '[
+  "Choose a safe outdoor route.",
+  "Start with a warm-up walk or light jog.",
+  "Run at a comfortable pace, maintaining good posture.",
+  "Breathe steadily and enjoy the scenery.",
+  "Cool down with a walk."
+]', 'Cardio', '["Legs"]', '[]', '[]', '[]', '["cardio"]', false),
+
+('Outdoor Cycling', '[
+  "Wear a helmet and choose a safe cycling route.",
+  "Start pedaling at a comfortable pace.",
+  "Shift gears as needed for hills or speed.",
+  "Maintain good posture and awareness of surroundings.",
+  "Cool down with easy pedaling."
+]', 'Cardio', '["Legs"]', '[]', '[]', '[]', '["cardio"]', false),
+
+('Outdoor Walking', '[
+  "Choose a safe path or park.",
+  "Walk at a brisk pace, swinging your arms naturally.",
+  "Maintain an upright posture.",
+  "Continue for the desired distance or time."
+]', 'Cardio', '["Legs"]', '[]', '[]', '[]', '["cardio"]', false),
+
+('Outdoor Hiking', '[
+  "Select a hiking trail suitable for your fitness level.",
+  "Wear appropriate footwear and carry water.",
+  "Walk at a steady pace, using your arms for balance on inclines.",
+  "Enjoy the natural environment.",
+  "Cool down with a gentle walk at the end."
+]', 'Cardio', '["Legs", "Glutes"]', '[]', '[]', '[]', '["cardio"]', false);
+
+
+
 -- CHEST
 INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
 VALUES
@@ -497,7 +1065,7 @@ VALUES
   "Unrack the bar and hold it above your chest with arms extended.",
   "Lower the bar slowly to your mid-chest, keeping elbows at about 75 degrees.",
   "Press the bar back up to the starting position, fully extending your arms."
-]', 'Chest', '["Triceps", "Shoulders"]', '["Barbell", "Bench"]', '[]', '[]', '["strength"]', true),
+]', 'Chest', '["Triceps", "Shoulders"]', '["Barbell", "Flat bench"]', '[]', '[]', '["strength"]', true),
 
 ('Push-Up', '[
   "Start in a high plank position with your hands slightly wider than shoulder-width apart.",
@@ -521,7 +1089,7 @@ VALUES
   "Stop when your elbows are at chest level or just below.",
   "Bring the dumbbells back up over your chest by squeezing your pecs.",
   "Repeat for the desired reps."
-]', 'Chest', '["Shoulders"]', '["Dumbbells", "Bench"]', '[]', '[]', '["strength"]', false),
+]', 'Chest', '["Shoulders"]', '["Dumbbells", "Flat bench"]', '[]', '[]', '["strength"]', false),
 
 ('Cable Crossover', '[
   "Stand between two cable stacks with the pulleys set at the highest position.",
@@ -529,6 +1097,98 @@ VALUES
   "Pull the handles down and together in front of your hips in a wide arc.",
   "Squeeze your chest at the bottom, then slowly return to the starting position."
 ]', 'Chest', '["Shoulders"]', '["Cable machine"]', '[]', '[]', '["strength"]', false);
+
+
+
+INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
+VALUES
+
+('Incline Barbell Bench Press', '[
+  "Set an incline bench to a 30-45 degree angle.",
+  "Lie back and grip the barbell with hands slightly wider than shoulder-width.",
+  "Unrack the bar and hold it above your chest with arms extended.",
+  "Lower the bar to your upper chest, then press it back up to the starting position."
+]', 'Chest', '["Triceps", "Shoulders"]', '["Barbell", "Incline bench"]', '[]', '[]', '["strength"]', true),
+
+('Decline Barbell Bench Press', '[
+  "Set a decline bench and secure your feet.",
+  "Lie back and grip the barbell with hands slightly wider than shoulder-width.",
+  "Unrack the bar and hold it above your chest with arms extended.",
+  "Lower the bar to your lower chest, then press it back up to the starting position."
+]', 'Chest', '["Triceps", "Shoulders"]', '["Barbell", "Decline bench"]', '[]', '[]', '["strength"]', true),
+
+('Decline Dumbbell Press', '[
+  "Set a decline bench and hold a dumbbell in each hand.",
+  "Lie back and press the dumbbells above your chest with arms extended.",
+  "Lower the dumbbells to your lower chest, then press them back up."
+]', 'Chest', '["Triceps", "Shoulders"]', '["Dumbbells", "Decline bench"]', '[]', '[]', '["strength"]', true),
+
+('Incline Dumbbell Fly', '[
+  "Set an incline bench to a 30-45 degree angle.",
+  "Lie back holding a dumbbell in each hand above your chest, palms facing each other.",
+  "With a slight bend in your elbows, lower the weights out to your sides in a wide arc.",
+  "Bring the dumbbells back up over your chest by squeezing your pecs."
+]', 'Chest', '["Shoulders"]', '["Dumbbells", "Incline bench"]', '[]', '[]', '["strength"]', false),
+
+('Decline Dumbbell Fly', '[
+  "Set a decline bench and hold a dumbbell in each hand above your chest.",
+  "With a slight bend in your elbows, lower the weights out to your sides in a wide arc.",
+  "Bring the dumbbells back up over your chest by squeezing your pecs."
+]', 'Chest', '["Shoulders"]', '["Dumbbells", "Decline bench"]', '[]', '[]', '["strength"]', false),
+
+('Machine Chest Press', '[
+  "Sit on the chest press machine and adjust the seat height.",
+  "Grab the handles with both hands and press them forward until your arms are extended.",
+  "Slowly return to the starting position."
+]', 'Chest', '["Triceps", "Shoulders"]', '["Chest press machine"]', '[]', '[]', '["strength"]', true),
+
+('Pec Deck Machine Fly', '[
+  "Sit on the pec deck machine with your back against the pad.",
+  "Place your forearms or hands against the pads.",
+  "Bring the pads together in front of your chest, squeezing your pecs.",
+  "Slowly return to the starting position."
+]', 'Chest', '["Shoulders"]', '["Pec deck / chest fly machine"]', '[]', '[]', '["strength"]', false),
+
+('Smith Machine Bench Press', '[
+  "Set the bar on a Smith machine to chest height.",
+  "Lie on a flat bench under the bar and grip it slightly wider than shoulder-width.",
+  "Unrack the bar and lower it to your chest.",
+  "Press the bar back up to the starting position."
+]', 'Chest', '["Triceps", "Shoulders"]', '["Smith machine", "Flat bench"]', '[]', '[]', '["strength"]', true),
+
+('Push-Up on Knees', '[
+  "Start in a push-up position but with your knees on the ground.",
+  "Lower your chest to the floor by bending your elbows.",
+  "Pause, then push back up to the starting position."
+]', 'Chest', '["Triceps", "Shoulders"]', '[]', '[]', '[]', '["strength", "calisthenics"]', true),
+
+('Incline Push-Up', '[
+  "Place your hands on an elevated surface such as a bench.",
+  "Keep your body in a straight line from head to heels.",
+  "Lower your chest to the bench, then push back up."
+]', 'Chest', '["Triceps", "Shoulders"]', '["Flat bench"]', '[]', '[]', '["strength", "calisthenics"]', true),
+
+('Decline Push-Up', '[
+  "Place your feet on an elevated surface such as a bench and your hands on the floor.",
+  "Keep your body in a straight line.",
+  "Lower your chest to the floor, then push back up."
+]', 'Chest', '["Triceps", "Shoulders"]', '["Flat bench"]', '[]', '[]', '["strength", "calisthenics"]', true),
+
+('Dips (Chest Focus)', '[
+  "Grip the handles of a dip station with arms extended.",
+  "Lean your torso forward and lower your body by bending your elbows.",
+  "Pause when your upper arms are parallel to the floor.",
+  "Press back up to the starting position."
+]', 'Chest', '["Triceps", "Shoulders"]', '["Dip station"]', '[]', '[]', '["strength", "calisthenics"]', true),
+
+('Cable Chest Press', '[
+  "Set the handles of a cable machine to chest height.",
+  "Stand in the center and grab a handle in each hand.",
+  "Press the handles forward until your arms are extended.",
+  "Slowly return to the starting position."
+]', 'Chest', '["Triceps", "Shoulders"]', '["Cable machine"]', '[]', '[]', '["strength"]', true);
+
+
 
 -- FOREARMS
 INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
@@ -549,13 +1209,6 @@ VALUES
   "Lower the barbell back to the starting position."
 ]', 'Forearms', '[]', '["Barbell"]', '[]', '[]', '["strength"]', false),
 
-('Farmer''s Walk', '[
-  "Stand upright holding a heavy dumbbell in each hand at your sides.",
-  "Keep your shoulders back and core engaged.",
-  "Walk forward for a set distance or time, maintaining good posture.",
-  "Set the weights down safely at the end of the walk."
-]', 'Forearms', '["Grip", "Traps"]', '["Dumbbells"]', '[]', '[]', '["strength", "conditioning"]', true),
-
 ('Plate Pinch', '[
   "Stand upright and hold two weight plates together with your fingers and thumb.",
   "Keep your arms at your sides and maintain a firm pinch grip.",
@@ -570,6 +1223,77 @@ VALUES
   "Pause when your chin is above the bar.",
   "Lower yourself slowly back to the starting position."
 ]', 'Forearms', '["Back", "Biceps"]', '["Towel", "Pull-up bar"]', '[]', '[]', '["strength", "calisthenics"]', true);
+
+INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
+VALUES
+
+('Dumbbell Wrist Curl', '[
+  "Sit on a bench holding a dumbbell in each hand with an underhand grip.",
+  "Rest your forearms on your thighs or the bench, wrists hanging over the edge.",
+  "Curl the dumbbells upward by flexing your wrists.",
+  "Pause and squeeze your forearms at the top.",
+  "Lower the dumbbells back to the starting position."
+]', 'Forearms', '[]', '["Dumbbells"]', '[]', '[]', '["strength"]', false),
+
+('Dumbbell Reverse Wrist Curl', '[
+  "Sit on a bench holding a dumbbell in each hand with an overhand grip.",
+  "Rest your forearms on your thighs or the bench, wrists hanging over the edge.",
+  "Extend your wrists upward, lifting the dumbbells.",
+  "Pause and squeeze your forearms at the top.",
+  "Lower the dumbbells back to the starting position."
+]', 'Forearms', '[]', '["Dumbbells"]', '[]', '[]', '["strength"]', false),
+
+('Barbell Reverse Curl', '[
+  "Stand holding a barbell with an overhand grip, hands shoulder-width apart.",
+  "Curl the barbell up toward your shoulders, keeping your elbows close to your body.",
+  "Pause at the top, then lower the bar back to the starting position."
+]', 'Forearms', '["Biceps"]', '["Barbell"]', '[]', '[]', '["strength"]', false),
+
+('Wrist Roller', '[
+  "Hold a wrist roller device with both hands, arms extended in front of you.",
+  "Roll the weight up by rotating your wrists, then lower it back down under control.",
+  "Repeat for several cycles."
+]', 'Forearms', '["Grip"]', '["Barbell"]', '[]', '[]', '["strength"]', false),
+
+('Reverse Grip EZ Bar Curl', '[
+  "Stand holding an EZ curl bar with an overhand grip.",
+  "Curl the bar up toward your shoulders, keeping your elbows close to your body.",
+  "Pause and squeeze your forearms at the top.",
+  "Lower the bar back to the starting position."
+]', 'Forearms', '["Biceps"]', '["Ez curl bar"]', '[]', '[]', '["strength"]', false),
+
+('Dead Hang', '[
+  "Hang from a pull-up bar with both hands, arms fully extended.",
+  "Keep your shoulders active and grip tight.",
+  "Hold for as long as possible to build grip and forearm strength."
+]', 'Forearms', '["Grip", "Shoulders"]', '["Pull-up bar"]', '[]', '[]', '["strength", "calisthenics"]', false),
+
+('Hammer Curl', '[
+  "Stand with a dumbbell in each hand, arms at your sides and palms facing your torso.",
+  "Keep your elbows close to your body and curl the weights up toward your shoulders.",
+  "Pause at the top, then lower the dumbbells back down with control."
+]', 'Forearms', '["Biceps"]', '["Dumbbells"]', '[]', '[]', '["strength"]', false),
+
+('Reverse Grip Cable Curl', '[
+  "Attach a straight bar to a low cable pulley.",
+  "Grasp the bar with an overhand grip and arms extended.",
+  "Curl the bar toward your shoulders, keeping your elbows close to your body.",
+  "Lower the bar back to the starting position."
+]', 'Forearms', '["Biceps"]', '["Cable machine"]', '[]', '[]', '["strength"]', false),
+
+('Band Wrist Extension', '[
+  "Anchor a resistance band under your foot and hold the other end in your hand, palm down.",
+  "Extend your wrist upward against the resistance of the band.",
+  "Pause and lower with control."
+]', 'Forearms', '[]', '["Resistance bands"]', '[]', '[]', '["strength"]', false),
+
+('Suitcase Carry', '[
+  "Hold a heavy dumbbell or kettlebell in one hand at your side.",
+  "Walk forward for a set distance or time, keeping your torso upright and core engaged.",
+  "Switch hands and repeat."
+]', 'Forearms', '["Grip", "Core"]', '["Dumbbells", "Kettlebells"]', '[]', '[]', '["strength", "functional"]', true);
+
+
 
 -- HAMSTRINGS
 INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
@@ -594,14 +1318,14 @@ VALUES
   "Start with your body straight and arms crossed over your chest.",
   "Lower your torso toward the ground by bending at the knees.",
   "Pause at the bottom, then contract your hamstrings and glutes to raise your body back up."
-]', 'Hamstrings', '["Glutes"]', '["GHD machine"]', '[]', '[]', '["strength"]', true),
+]', 'Hamstrings', '["Glutes"]', '["Glute ham developer (ghd)"]', '[]', '[]', '["strength"]', true),
 
 ('Kettlebell Swing', '[
   "Stand with feet shoulder-width apart, holding a kettlebell with both hands.",
   "Hinge at your hips and swing the kettlebell back between your legs.",
   "Thrust your hips forward to swing the kettlebell up to shoulder height.",
   "Let the kettlebell swing back down and repeat in a fluid motion."
-]', 'Hamstrings', '["Glutes", "Back"]', '["Kettlebell"]', '[]', '[]', '["strength", "conditioning"]', true),
+]', 'Hamstrings', '["Glutes", "Back"]', '["Kettlebells"]', '[]', '[]', '["strength", "conditioning"]', true),
 
 ('Single-Leg Deadlift', '[
   "Stand on one leg holding a dumbbell in the opposite hand.",
@@ -609,7 +1333,71 @@ VALUES
   "Extend your free leg straight behind you for balance.",
   "Return to the starting position by driving your hips forward.",
   "Repeat on the other leg."
-]', 'Hamstrings', '["Glutes", "Core"]', '["Dumbbell"]', '[]', '[]', '["strength", "balance"]', false);
+]', 'Hamstrings', '["Glutes", "Core"]', '["Dumbbells"]', '[]', '[]', '["strength", "balance"]', false);
+
+INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
+VALUES
+
+('Romanian Deadlift', '[
+  "Stand with feet hip-width apart, holding a barbell in front of your thighs.",
+  "Keep your knees slightly bent and your back straight.",
+  "Hinge at the hips and lower the barbell down the front of your legs.",
+  "Stop when you feel a stretch in your hamstrings.",
+  "Drive your hips forward to return to the starting position."
+]', 'Hamstrings', '["Glutes", "Lower back"]', '["Barbell"]', '[]', '[]', '["strength"]', true),
+
+('Stiff-Leg Deadlift', '[
+  "Stand with feet shoulder-width apart, holding a barbell in front of your thighs.",
+  "Keep your knees almost straight and your back flat.",
+  "Hinge at the hips and lower the barbell down the front of your legs.",
+  "Stop when you feel a stretch in your hamstrings.",
+  "Return to the starting position by driving your hips forward."
+]', 'Hamstrings', '["Glutes", "Lower back"]', '["Barbell"]', '[]', '[]', '["strength"]', true),
+
+('Nordic Hamstring Curl', '[
+  "Kneel on a mat and secure your feet under a stable object or with a partner.",
+  "Cross your arms over your chest.",
+  "Lower your torso toward the floor as slowly as possible, keeping your hips extended.",
+  "Catch yourself with your hands at the bottom and push back up."
+]', 'Hamstrings', '[]', '[]', '[]', '[]', '["strength", "calisthenics"]', false),
+
+('Leg Curl (Machine)', '[
+  "Lie face down on a leg curl machine and position your ankles under the pad.",
+  "Grip the handles and keep your hips pressed into the bench.",
+  "Curl your legs up toward your glutes by flexing your knees.",
+  "Pause at the top, then lower the pad back to the starting position."
+]', 'Hamstrings', '[]', '["Leg curl machine"]', '[]', '[]', '["strength"]', false),
+
+('Seated Leg Curl', '[
+  "Sit on a leg curl machine and position your ankles under the pad.",
+  "Grip the handles and keep your back against the pad.",
+  "Curl your legs down and back as far as possible.",
+  "Pause, then slowly return to the starting position."
+]', 'Hamstrings', '[]', '["Leg curl machine"]', '[]', '[]', '["strength"]', false),
+
+('Lying Dumbbell Leg Curl', '[
+  "Lie face down on a flat bench, holding a dumbbell between your feet.",
+  "Curl your legs up toward your glutes, apretando los isquiotibiales.",
+  "Lower the dumbbell back down with control."
+]', 'Hamstrings', '[]', '["Flat bench", "Dumbbells"]', '[]', '[]', '["strength"]', false),
+
+('Single-Leg Romanian Deadlift', '[
+  "Stand on one leg holding a dumbbell in the opposite hand.",
+  "Keep your back straight and hinge at the hips, lowering the dumbbell toward the floor.",
+  "Extend your free leg straight behind you for balance.",
+  "Return to the starting position by driving your hips forward.",
+  "Repeat on the other leg."
+]', 'Hamstrings', '["Glutes", "Core"]', '["Dumbbells"]', '[]', '[]', '["strength", "balance"]', false),
+
+('Standing Leg Curl (Machine)', '[
+  "Stand at a leg curl machine and place your ankle behind the roller pad.",
+  "Grip the handles for support.",
+  "Curl your leg up toward your glutes, squeezing your hamstring.",
+  "Lower the pad back down slowly.",
+  "Repeat with the other leg."
+]', 'Hamstrings', '[]', '["Leg curl machine"]', '[]', '[]', '["strength"]', false);
+
+
 
 -- HIPS
 INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
@@ -619,7 +1407,7 @@ VALUES
   "Plant your feet flat on the floor, shoulder-width apart.",
   "Drive through your heels to lift your hips up until your thighs are parallel to the floor.",
   "Squeeze your glutes at the top, then lower your hips back down."
-]', 'Hips', '["Glutes", "Hamstrings"]', '["Bench", "Barbell"]', '[]', '[]', '["strength"]', true),
+]', 'Hips', '["Glutes", "Hamstrings"]', '["Flat bench", "Barbell"]', '[]', '[]', '["strength"]', true),
 
 ('Clamshell', '[
   "Lie on your side with your knees bent at 90 degrees and your feet together.",
@@ -647,7 +1435,64 @@ VALUES
   "Bend your knees slightly and lower into a half squat.",
   "Step to the side with one foot, then bring the other foot to follow.",
   "Continue stepping side to side, keeping tension on the band."
-]', 'Hips', '["Glutes"]', '["Resistance band"]', '[]', '[]', '["strength"]', false);
+]', 'Hips', '["Glutes"]', '["Resistance bands"]', '[]', '[]', '["strength"]', false);
+
+INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
+VALUES
+
+('Barbell Hip Thrust', '[
+  "Sit on the floor with your upper back against a bench and a barbell over your hips.",
+  "Plant your feet flat on the floor, shoulder-width apart.",
+  "Drive through your heels to lift your hips up until your thighs are parallel to the floor.",
+  "Squeeze your glutes at the top, then lower your hips back down."
+]', 'Hips', '["Hamstrings"]', '["Flat bench", "Barbell"]', '[]', '[]', '["strength"]', true),
+
+('Glute Bridge', '[
+  "Lie on your back with knees bent and feet flat on the floor.",
+  "Push through your heels to lift your hips up, squeezing your glutes at the top.",
+  "Pause, then lower your hips back down."
+]', 'Hips', '["Hamstrings"]', '[]', '[]', '[]', '["strength", "calisthenics"]', false),
+
+('Single-Leg Glute Bridge', '[
+  "Lie on your back with knees bent and feet flat on the floor.",
+  "Extend one leg straight and push through the heel of the other foot to lift your hips.",
+  "Squeeze your glutes at the top, then lower back down.",
+  "Repeat on the other side."
+]', 'Hips', '["Hamstrings"]', '[]', '[]', '[]', '["strength", "calisthenics"]', false),
+
+('Hip Abduction Machine', '[
+  "Sit on the hip abduction machine and place your legs against the pads.",
+  "Push your legs outward against the resistance.",
+  "Pause at the top, then slowly return to the starting position."
+]', 'Hips', '[]', '["Leg extension machine"]', '[]', '[]', '["strength"]', false),
+
+('Cable Kickback', '[
+  "Attach an ankle strap to a low cable pulley and secure it around your ankle.",
+  "Stand facing the machine and hold onto the frame for balance.",
+  "Kick your leg straight back, squeezing your glute at the top.",
+  "Slowly return to the starting position."
+]', 'Hips', '["Hamstrings"]', '["Cable machine"]', '[]', '[]', '["strength"]', false),
+
+('Banded Glute Bridge', '[
+  "Place a resistance band just above your knees and lie on your back with feet flat on the floor.",
+  "Push your knees outward against the band as you lift your hips up.",
+  "Squeeze your glutes at the top, then lower back down."
+]', 'Hips', '["Hamstrings"]', '["Resistance bands"]', '[]', '[]', '["strength"]', false),
+
+('Step-Up', '[
+  "Stand in front of a bench or plyometric box.",
+  "Step up with one foot, pressing through your heel to lift your body up.",
+  "Squeeze your glute at the top, then step back down.",
+  "Repeat on the other side."
+]', 'Hips', '["Quadriceps"]', '["Flat bench", "Plyometric box"]', '[]', '[]', '["strength", "functional"]', true),
+
+('Bulgarian Split Squat (Glute Focus)', '[
+  "Stand a few feet in front of a bench and place one foot behind you on the bench.",
+  "Lower your hips down and back, focusing on the front glute.",
+  "Push through your front heel to return to standing.",
+  "Repeat on both sides."
+]', 'Hips', '["Quadriceps"]', '["Flat bench"]', '[]', '[]', '["strength", "balance"]', true);
+
 
 
 -- NECK
@@ -722,7 +1567,7 @@ VALUES
   "Lower your back knee toward the floor, keeping your front knee over your ankle.",
   "Push through your front heel to return to standing.",
   "Repeat all reps on one leg, then switch."
-]', 'Quadriceps', '["Glutes"]', '["Bench", "Dumbbells"]', '[]', '[]', '["strength", "balance"]', false),
+]', 'Quadriceps', '["Glutes"]', '["Flat bench", "Dumbbells"]', '[]', '[]', '["strength", "balance"]', false),
 
 ('Step Up', '[
   "Stand facing a bench or sturdy platform with a dumbbell in each hand.",
@@ -730,7 +1575,38 @@ VALUES
   "Bring your trailing leg up to stand fully on the bench.",
   "Step back down with the same leg and repeat.",
   "Alternate legs or complete all reps on one side before switching."
-]', 'Quadriceps', '["Glutes", "Hamstrings"]', '["Bench", "Dumbbells"]', '[]', '[]', '["strength", "balance"]', false);
+]', 'Quadriceps', '["Glutes", "Hamstrings"]', '["Flat bench", "Dumbbells"]', '[]', '[]', '["strength", "balance"]', false);
+
+INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
+VALUES
+
+('Hack Squat (Machine)', '[
+  "Position yourself in the hack squat machine with your shoulders under the pads and feet shoulder-width apart.",
+  "Release the safety handles and lower yourself by bending your knees.",
+  "Descend until your thighs are parallel to the platform.",
+  "Push through your heels to return to the starting position."
+]', 'Quadriceps', '["Glutes"]', '["Hack squat machine"]', '[]', '[]', '["strength"]', true),
+
+('Smith Machine Squat', '[
+  "Set the bar on a Smith machine to shoulder height.",
+  "Stand under the bar with feet shoulder-width apart.",
+  "Unrack the bar and squat down until your thighs are parallel to the floor.",
+  "Push through your heels to return to the starting position."
+]', 'Quadriceps', '["Glutes", "Hamstrings"]', '["Smith machine"]', '[]', '[]', '["strength"]', true),
+
+('Sissy Squat', '[
+  "Stand upright with your feet shoulder-width apart and hold onto a stable object for balance.",
+  "Rise onto your toes and lean your torso back as you bend your knees forward.",
+  "Lower your body as far as comfortable, then push back up to the starting position."
+]', 'Quadriceps', '[]', '[]', '[]', '[]', '["strength", "calisthenics"]', false),
+
+('Goblet Squat', '[
+  "Stand with your feet shoulder-width apart, holding a dumbbell or kettlebell at your chest.",
+  "Squat down, keeping your chest up and elbows inside your knees.",
+  "Lower until your thighs are parallel to the floor, then push through your heels to stand."
+]', 'Quadriceps', '["Glutes"]', '["Dumbbells", "Kettlebells"]', '[]', '[]', '["strength"]', false);
+
+
 
 -- SHOULDERS
 INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
@@ -768,6 +1644,64 @@ VALUES
   "Slowly return to the starting position."
 ]', 'Shoulders', '["Upper back"]', '["Cable machine"]', '[]', '[]', '["strength"]', false);
 
+INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
+VALUES
+
+('Upright Row', '[
+  "Stand with your feet shoulder-width apart, holding a barbell or dumbbells in front of your thighs with an overhand grip.",
+  "Pull the weight straight up toward your chin, keeping your elbows higher than your wrists.",
+  "Pause at the top, then lower the weight back to the starting position."
+]', 'Shoulders', '["Trapezius"]', '["Barbell"]', '[]', '[]', '["strength"]', false),
+
+('Single-Arm Dumbbell Shoulder Press', '[
+  "Stand or sit holding a dumbbell at shoulder height with one hand.",
+  "Press the dumbbell overhead until your arm is fully extended.",
+  "Lower it back to shoulder height and repeat before switching arms."
+]', 'Shoulders', '["Triceps"]', '["Dumbbells"]', '[]', '[]', '["strength"]', true),
+
+('Kettlebell Overhead Press', '[
+  "Stand with your feet shoulder-width apart, holding a kettlebell at shoulder height.",
+  "Press the kettlebell overhead until your arm is fully extended.",
+  "Lower it back to shoulder height and repeat."
+]', 'Shoulders', '["Triceps"]', '["Kettlebells"]', '[]', '[]', '["strength"]', true),
+
+('Dumbbell Cuban Press', '[
+  "Stand holding a dumbbell in each hand with arms at your sides and palms facing your thighs.",
+  "Raise the dumbbells to shoulder height with elbows bent at 90 degrees (like a scarecrow).",
+  "Rotate your arms upward so your forearms are vertical, then press overhead.",
+  "Reverse the motion to return to the start."
+]', 'Shoulders', '["Rotator cuff"]', '["Dumbbells"]', '[]', '[]', '["strength", "mobility"]', false),
+
+('Reverse Pec Deck (Rear Delt Machine)', '[
+  "Sit facing the pec deck machine with your chest against the pad.",
+  "Grab the handles or place your arms on the pads with elbows slightly bent.",
+  "Pull the handles or pads outward and backward, squeezing your rear delts.",
+  "Slowly return to the starting position."
+]', 'Shoulders', '[]', '["Pec deck / chest fly machine"]', '[]', '[]', '["strength"]', false),
+
+('Landmine Shoulder Press', '[
+  "Place one end of a barbell into a landmine attachment.",
+  "Hold the other end at shoulder height with one or both hands.",
+  "Press the barbell upward and forward until your arm is extended.",
+  "Lower back to the starting position."
+]', 'Shoulders', '["Triceps"]', '["Landmine attachment", "Barbell"]', '[]', '[]', '["strength"]', true),
+
+('TRX Y Raise', '[
+  "Hold the TRX handles and lean back with arms extended.",
+  "Raise your arms overhead in a Y shape, keeping your body straight.",
+  "Pause at the top, then lower yourself back to the starting position."
+]', 'Shoulders', '[]', '["Trx / suspension trainer"]', '[]', '[]', '["strength", "calisthenics"]', false),
+
+('Resistance Band Shoulder Press', '[
+  "Stand on a resistance band and hold the handles at shoulder height.",
+  "Press the handles overhead until your arms are fully extended.",
+  "Lower the handles back to shoulder height."
+]', 'Shoulders', '["Triceps"]', '["Resistance bands"]', '[]', '[]', '["strength"]', true);
+
+
+
+
+
 -- THIGHS
 INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
 VALUES
@@ -800,15 +1734,7 @@ VALUES
   "Release the safety handles and lower the platform by bending your knees.",
   "Stop when your knees are at a 90-degree angle.",
   "Press the platform back up by extending your legs, but do not lock your knees."
-]', 'Thighs', '["Glutes", "Quadriceps"]', '["Leg press machine"]', '[]', '[]', '["strength"]', true),
-
-('Goblet Squat', '[
-  "Stand with your feet shoulder-width apart, holding a dumbbell vertically at your chest.",
-  "Brace your core and keep your chest up.",
-  "Squat down by bending your knees and hips, keeping the dumbbell close to your chest.",
-  "Lower until your thighs are parallel to the floor.",
-  "Push through your heels to return to standing."
-]', 'Thighs', '["Glutes", "Calves"]', '["Dumbbell"]', '[]', '[]', '["strength"]', true);
+]', 'Thighs', '["Glutes", "Quadriceps"]', '["Leg press machine"]', '[]', '[]', '["strength"]', true);
 
 -- TRICEPS
 INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
@@ -826,21 +1752,21 @@ VALUES
   "Keep your elbows close to your ears and your core engaged.",
   "Lower the dumbbell behind your head by bending your elbows.",
   "Pause when you feel a stretch in your triceps, then extend your arms to return to the starting position."
-]', 'Triceps', '[]', '["Dumbbell"]', '[]', '[]', '["strength"]', false),
+]', 'Triceps', '[]', '["Dumbbells"]', '[]', '[]', '["strength"]', false),
 
 ('Bench Dip', '[
   "Sit on the edge of a bench with your hands gripping the edge beside your hips.",
   "Place your feet flat on the floor and slide your hips off the bench.",
   "Lower your body by bending your elbows until your upper arms are parallel to the floor.",
   "Push through your palms to straighten your arms and lift your body back up."
-]', 'Triceps', '["Shoulders", "Chest"]', '["Bench"]', '[]', '[]', '["strength", "calisthenics"]', true),
+]', 'Triceps', '["Shoulders", "Chest"]', '["Flat bench"]', '[]', '[]', '["strength", "calisthenics"]', true),
 
 ('Close-Grip Bench Press', '[
   "Lie flat on a bench holding a barbell with a narrow, overhand grip (hands about shoulder-width apart).",
   "Unrack the bar and hold it above your chest with arms extended.",
   "Lower the bar slowly to your mid-chest, keeping your elbows close to your body.",
   "Press the bar back up to the starting position, fully extending your arms."
-]', 'Triceps', '["Chest", "Shoulders"]', '["Barbell", "Bench"]', '[]', '[]', '["strength"]', true),
+]', 'Triceps', '["Chest", "Shoulders"]', '["Barbell", "Flat bench"]', '[]', '[]', '["strength"]', true),
 
 ('Diamond Push-Up', '[
   "Start in a high plank position with your hands close together under your chest, forming a diamond shape with your thumbs and index fingers.",
@@ -849,6 +1775,67 @@ VALUES
   "Pause when your chest is just above your hands.",
   "Push through your palms to return to the starting position."
 ]', 'Triceps', '["Chest", "Shoulders"]', '[]', '[]', '[]', '["strength", "calisthenics"]', true);
+
+INSERT INTO public."Exercises" (name, instructions, primary_muscle, secondary_muscles, equipment_required, photos, videos, type, compound)
+VALUES
+
+('Skullcrusher (Lying Triceps Extension)', '[
+  "Lie flat on a bench holding an EZ curl bar or barbell with a narrow overhand grip.",
+  "Extend your arms straight above your chest.",
+  "Bend your elbows to lower the bar toward your forehead, keeping your upper arms stationary.",
+  "Extend your elbows to return the bar to the starting position."
+]', 'Triceps', '[]', '["Ez curl bar", "Flat bench"]', '[]', '[]', '["strength"]', false),
+
+('Triceps Kickback', '[
+  "Hold a dumbbell in one hand and place your opposite knee and hand on a bench for support.",
+  "Keep your upper arm parallel to your torso and bend your elbow to 90 degrees.",
+  "Extend your arm back by straightening your elbow, squeezing your triceps at the top.",
+  "Lower the dumbbell back to the starting position. Repeat on the other side."
+]', 'Triceps', '[]', '["Dumbbells", "Flat bench"]', '[]', '[]', '["strength"]', false),
+
+('Rope Tricep Pushdown', '[
+  "Attach a rope to a high pulley on a cable machine.",
+  "Stand facing the machine and grasp the rope with both hands, palms facing each other.",
+  "Keep your elbows close to your sides and push the rope down by extending your elbows.",
+  "At the bottom, separate the ends of the rope and squeeze your triceps.",
+  "Slowly return to the starting position."
+]', 'Triceps', '[]', '["Cable machine"]', '[]', '[]', '["strength"]', false),
+
+('Seated Overhead Triceps Extension (Dumbbell)', '[
+  "Sit on a bench with back support, holding a dumbbell with both hands above your head.",
+  "Keep your elbows close to your ears and your core engaged.",
+  "Lower the dumbbell behind your head by bending your elbows.",
+  "Extend your arms to return to the starting position."
+]', 'Triceps', '[]', '["Dumbbells", "Flat bench"]', '[]', '[]', '["strength"]', false),
+
+('Triceps Extension (Machine)', '[
+  "Sit at a triceps extension machine and grasp the handles with an overhand grip.",
+  "Keep your elbows close to your sides.",
+  "Extend your arms downward to straighten your elbows.",
+  "Pause and squeeze your triceps, then slowly return to the starting position."
+]', 'Triceps', '[]', '["Chest press machine"]', '[]', '[]', '["strength"]', false),
+
+('One-Arm Overhead Cable Triceps Extension', '[
+  "Attach a single handle to a low pulley on a cable machine.",
+  "Stand with your back to the machine and hold the handle overhead with one hand.",
+  "Keep your upper arm stationary and extend your elbow to straighten your arm.",
+  "Lower the handle back behind your head and repeat. Switch arms."
+]', 'Triceps', '[]', '["Cable machine"]', '[]', '[]', '["strength"]', false),
+
+('Reverse Grip Tricep Pushdown', '[
+  "Attach a straight bar to a high pulley on a cable machine.",
+  "Stand facing the machine and grasp the bar with an underhand grip.",
+  "Keep your elbows close to your sides and extend your arms downward.",
+  "Pause and squeeze your triceps at the bottom, then slowly return to the starting position."
+]', 'Triceps', '[]', '["Cable machine"]', '[]', '[]', '["strength"]', false),
+
+('Close-Grip Push-Up', '[
+  "Start in a high plank position with your hands just inside shoulder width.",
+  "Keep your body in a straight line and lower your chest toward the floor.",
+  "Push through your palms to return to the starting position."
+]', 'Triceps', '["Chest", "Shoulders"]', '[]', '[]', '[]', '["strength", "calisthenics"]', true);
+
+
 
 
 -- =========================

@@ -14,7 +14,7 @@ import { BackButton, ScreenTitle } from "../../../global/components/UIElements";
 import { UserContext } from "../../../global/contexts/UserContext";
 import { supabase } from "../../../global/services/supabaseService";
 
-// Default preferences (ahora reps_progression es array)
+// Default preferences
 const DEFAULT_PREFERENCES = {
   supersets: false,
   dropsets: false,
@@ -26,8 +26,8 @@ const DEFAULT_PREFERENCES = {
   plate_calculator: false,
   rest_time: {
     enabled: true,
-    compound: 150, // seconds (2:30)
-    isolation: 90, // seconds (1:30)
+    compound: 150,
+    isolation: 90,
   },
   reps_progression: {
     compound: ["Straight"],
@@ -48,7 +48,6 @@ export default function AdvancedSettingsScreen({ navigation }) {
           ? JSON.parse(user.settings.app_preferences)
           : user.settings.app_preferences
         : DEFAULT_PREFERENCES;
-      // Compatibilidad con versiones antiguas (string en vez de array)
       return {
         ...p,
         reps_progression: {
@@ -65,12 +64,10 @@ export default function AdvancedSettingsScreen({ navigation }) {
     }
   })();
 
-  // Estado optimista para UI inmediata
   const [optimisticPrefs, setOptimisticPrefs] = useState(preferences);
   const [modal, setModal] = useState(null);
   const [progressionTab, setProgressionTab] = useState("compound");
 
-  // Actualización optimista de preferencias simples
   const updatePreferenceOptimistic = async (key, value) => {
     const prev = { ...optimisticPrefs };
     setOptimisticPrefs((p) => ({ ...p, [key]: value }));
@@ -85,7 +82,6 @@ export default function AdvancedSettingsScreen({ navigation }) {
     }
   };
 
-  // Actualización optimista de preferencias anidadas
   const updateNestedPreferenceOptimistic = async (key, subkey, value) => {
     const prev = { ...optimisticPrefs };
     setOptimisticPrefs((p) => ({
@@ -108,7 +104,7 @@ export default function AdvancedSettingsScreen({ navigation }) {
     }
   };
 
-  // Selección múltiple reps_progression
+  // Handler for progression preferences
   const handleProgressionChange = (type) => {
     const currentTab = progressionTab;
     const currentSelection = optimisticPrefs.reps_progression[currentTab];
@@ -700,7 +696,7 @@ export default function AdvancedSettingsScreen({ navigation }) {
               style={styles.closeModalButton}
               onPress={() => setModal(null)}
             >
-              <Text style={styles.closeModalText}>Cerrar</Text>
+              <Text style={styles.closeModalText}>Close</Text>
             </TouchableOpacity>
           </View>
         </View>

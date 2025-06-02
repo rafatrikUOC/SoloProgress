@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   Modal,
-  Dimensions,
   TouchableOpacity,
   StyleSheet,
   Image,
@@ -12,26 +11,19 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
+import { useIsFocused } from "@react-navigation/native";
 import { useThemeContext } from "../../../global/contexts/ThemeContext";
 import { UserContext } from "../../../global/contexts/UserContext";
-import ToastMessage from "../../../global/components/ToastMessage";
 import { getData, clearData } from "../../../global/utils/storage";
+import { capitalizeFirstLetter, joinAndCapitalize } from "../../../global/components/Normalize";
+import ToastMessage from "../../../global/components/ToastMessage";
 import { supabase } from "../../../global/services/supabaseService";
+import useNextWorkout from '../hooks/useNextWorkout';
+import useSkipSession from '../hooks/useSkipSession';
+import { shareWorkout } from "../../../global/utils/share";
 
-const SCREEN_WIDTH = Dimensions.get("window").width;
-const SLIDER_IMAGES = Array(6).fill({ uri: "" });
-const DEFAULT_IMAGE = "https://via.placeholder.com/60?text=No+Image";
+const DEFAULT_IMAGE = "https://placehold.co/400";
 
-const EXERCISES = [
-  "Push up",
-  "Incline dumbbell fly",
-  "Shoulder press",
-  "Triceps dips",
-  "Chest press",
-  "Overhead triceps extension",
-];
-
-// Returns a color from the palette based on recovery value
 const getRecoveryColor = (value, colors) => {
   if (value >= 80) return colors.text.success;
   if (value >= 50) return colors.text.warning;
@@ -39,7 +31,7 @@ const getRecoveryColor = (value, colors) => {
   return colors.text.danger;
 };
 
-// Async fetch for gym details and equipment count using Supabase
+// Fetch gym details utility
 async function fetchGymDetailsById(gym_id) {
   const { data, error: fetchError } = await supabase
     .from("Gyms")
@@ -56,7 +48,6 @@ async function fetchGymDetailsById(gym_id) {
     };
   }
 
-  // Count equipment items from the JSON field
   let equipmentCount = 0;
   if (Array.isArray(data.equipment)) {
     equipmentCount = data.equipment.length;
@@ -83,8 +74,31 @@ export default function HomeScreen({ navigation }) {
   const { colors, typography } = useThemeContext();
   const { user, refreshUser } = useContext(UserContext);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [activeSession, setActiveSession] = useState(null);
 
-  // After redirecting to the Profile stack and having the mustChangePassword, you'll be redirected to the correct screen
+  // Check if there is an unfinished TrainingSession for the user
+  useEffect(() => {
+    async function fetchActiveSession() {
+      if (!user?.info?.id) return;
+      const { data, error } = await supabase
+        .from("TrainingSessions")
+        .select("*")
+        .eq("user_id", user.info.id)
+        .not("start_time", "is", null)
+        .is("end_time", null)
+        .order("start_time", { ascending: false })
+        .limit(1)
+        .single();
+      if (data && data.id) {
+        setActiveSession(data);
+      } else {
+        setActiveSession(null);
+      }
+    }
+    fetchActiveSession();
+  }, [user?.info?.id]);
+
+  // Toast and password logic
   useEffect(() => {
     const checkMustChangePassword = async () => {
       const flag = await getData("mustChangePassword");
@@ -115,21 +129,15 @@ export default function HomeScreen({ navigation }) {
     }
   }, [showSuccessToast]);
 
-
-  // Get gyms and active gym from user.settings.performance_data
+  // Gyms logic
   const storedGyms = user?.settings?.performance_data?.stored_gyms || [];
   const activeGym = user?.settings?.performance_data?.active_gym || null;
-
-  // State for modal
   const [menuGymId, setMenuGymId] = useState(null);
   const [gymModalVisible, setGymModalVisible] = useState(false);
   const [gymsDetails, setGymsDetails] = useState([]);
   const [gymsLoading, setGymsLoading] = useState(false);
-
-  // Local active gym for immediate UI feedback
   const [localActiveGym, setLocalActiveGym] = useState(activeGym);
 
-  // Always fetch gyms when opening modal (so it's always up to date)
   const loadGymsDetails = async () => {
     setGymsLoading(true);
     try {
@@ -143,7 +151,6 @@ export default function HomeScreen({ navigation }) {
     setGymsLoading(false);
   };
 
-  // Open modal and fetch gyms
   const handleOpenGymModal = () => {
     setGymModalVisible(true);
     loadGymsDetails();
@@ -159,7 +166,6 @@ export default function HomeScreen({ navigation }) {
     setLocalActiveGym(gymId);
     setGymModalVisible(false);
 
-    // Update database and refresh context
     const { error } = await supabase
       .from("UserSettings")
       .update({
@@ -177,20 +183,14 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  // Delete gym handler (removes from user settings and Supabase)
   const deleteGym = async (gymId) => {
     closeGymMenu();
-
-    // Remove from stored_gyms
     const newStoredGyms = storedGyms.filter(id => id !== gymId);
-
-    // Determine new active gym
     let newActiveGym = localActiveGym;
     if (localActiveGym === gymId) {
       newActiveGym = newStoredGyms.length > 0 ? Number(newStoredGyms[0]) : null;
     }
 
-    // Update user settings in Supabase
     const { error: updateError } = await supabase
       .from("UserSettings")
       .update({
@@ -203,35 +203,119 @@ export default function HomeScreen({ navigation }) {
       .eq("user_id", user.info.id);
 
     if (!updateError) {
-      // Remove from Gyms table
-      const { error: gymDeleteError } = await supabase
+      await supabase
         .from("Gyms")
         .delete()
         .eq("id", gymId);
 
-      if (!gymDeleteError) {
-      } else {
-        console.error(`[Gym] Error deleting gym from Gyms table:`, gymDeleteError);
-      }
-
-      // Update local state for UI
       setGymsDetails(prev => prev.filter(g => g.id !== gymId));
       setLocalActiveGym(newActiveGym);
-
       refreshUser && refreshUser();
-      if (newActiveGym) {
-      } else {
-      }
     } else {
       console.error(`[Gym] Error updating user settings:`, updateError);
     }
   };
 
-  // Open ellipsis menu for a gym
   const openGymMenu = (gymId) => setMenuGymId(gymId);
-
-  // Close ellipsis menu
   const closeGymMenu = () => setMenuGymId(null);
+
+  // Next workout logic
+  const isFocused = useIsFocused();
+  const { nextWorkout, loading: nextWorkoutLoading } = useNextWorkout(user, isFocused);
+  const { handleSkip } = useSkipSession(user?.info?.id);
+  const [exerciseList, setExerciseList] = useState([]);
+  const [loadingExercises, setLoadingExercises] = useState(false);
+
+  useEffect(() => {
+    const fetchNextWorkout = async () => {
+      setNextWorkoutLoading(true);
+      try {
+        const splitId =
+          user?.settings?.selected_routine ||
+          user?.split?.id ||
+          user?.settings?.performance_data?.selected_routine;
+        if (!splitId || !user?.info?.id) {
+          setNextWorkout(null);
+          setNextWorkoutLoading(false);
+          return;
+        }
+
+        // 1. Get all planned workouts for user and split
+        const { data: plannedWorkouts } = await supabase
+          .from("UserPlannedWorkouts")
+          .select("*")
+          .eq("user_id", user.info.id)
+          .eq("split_id", splitId)
+          .order("session_index", { ascending: true });
+
+        if (!plannedWorkouts || plannedWorkouts.length === 0) {
+          setNextWorkout(null);
+          setNextWorkoutLoading(false);
+          return;
+        }
+
+        // 2. Get last completed session for user and split
+        const { data: lastSession } = await supabase
+          .from("TrainingSessions")
+          .select("session_index")
+          .eq("user_id", user.info.id)
+          .eq("split_id", splitId)
+          .not("end_time", "is", null)
+          .order("end_time", { ascending: false })
+          .limit(1)
+          .single();
+
+        let nextSessionIndex = 0;
+        if (lastSession && typeof lastSession.session_index === "number") {
+          nextSessionIndex = lastSession.session_index + 1;
+        }
+
+        // If all workouts have been completed, start again
+        if (!plannedWorkouts.some(w => w.session_index === nextSessionIndex)) {
+          nextSessionIndex = 0;
+        }
+
+        const next = plannedWorkouts.find(
+          (w) => w.session_index === nextSessionIndex
+        );
+
+        setNextWorkout(next || null);
+      } catch (e) {
+        setNextWorkout(null);
+      }
+      setNextWorkoutLoading(false);
+    };
+
+    if (isFocused) {
+      fetchNextWorkout();
+    }
+  }, [user, isFocused]);
+
+  useEffect(() => {
+    async function fetchExercisesInfo() {
+      if (!nextWorkout || !nextWorkout.exercises || nextWorkout.exercises.length === 0) {
+        setExerciseList([]);
+        return;
+      }
+      setLoadingExercises(true);
+      const { data } = await supabase
+        .from("Exercises")
+        .select("id, name, photos")
+        .in("id", nextWorkout.exercises);
+
+      // Order the result to match the order in nextWorkout.exercises
+      const idOrder = nextWorkout.exercises.map(e => (typeof e === "object" ? e.id : e));
+      const ordered = [];
+      idOrder.forEach(id => {
+        const found = (data || []).find(e => e.id === id);
+        if (found) ordered.push(found);
+      });
+
+      setExerciseList(ordered);
+      setLoadingExercises(false);
+    }
+    fetchExercisesInfo();
+  }, [nextWorkout]);
 
   // Modal styles only
   const modalStyles = StyleSheet.create({
@@ -527,7 +611,6 @@ export default function HomeScreen({ navigation }) {
     nextWorkoutDetails: {
       fontSize: 13,
       color: colors.text.muted,
-      marginBottom: 14,
     },
     sliderContainer: {
       width: '100%',
@@ -538,14 +621,13 @@ export default function HomeScreen({ navigation }) {
       width: 60,
       height: 60,
       borderRadius: 8,
-      marginRight: 10,
       backgroundColor: "#ccc",
     },
     exerciseList: {
       marginBottom: 16,
     },
     exerciseText: {
-      fontSize: 15,
+      fontSize: 14,
       color: colors.text.muted,
     },
     actionIconsRow: {
@@ -688,6 +770,9 @@ export default function HomeScreen({ navigation }) {
   // Example recovery value
   const recoveryValue = 82;
 
+  const currentSplit = nextWorkout?.split_id;
+  const currentSessionIndex = nextWorkout?.session_index;
+
   return (
     <ScrollView style={styles.scrollView}>
       <ToastMessage
@@ -727,64 +812,109 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Next Workout Card */}
+        {/* Next workout card */}
         <View style={styles.nextWorkoutCard}>
           <View style={styles.nextWorkoutHeaderPill}>
             <Text style={styles.nextWorkoutHeaderText}>
-              Next workout - Push
+              {`Next workout — ${nextWorkout?.title || "?"}`}
+              {activeSession && <Text style={{ color: colors.text.white }}> (Active)</Text>}
             </Text>
           </View>
+
+          {/* Workout main muscles */}
           <Text style={styles.nextWorkoutMuscles}>
-            Chest, Shoulders, Triceps
+            {joinAndCapitalize(nextWorkout?.details?.main_muscles || [])}
           </Text>
           <Text style={styles.nextWorkoutDetails}>
-            56 min · 6 exercises
+            {`${nextWorkout?.details?.duration || "?"} minutes - ${nextWorkout?.exercises?.length || 0} exercises`}
           </Text>
 
-          {/* Slider de imágenes pequeñas */}
-          <View style={styles.sliderContainer}>
+          {/* Exercise image slider */}
+          {loadingExercises ? (
+            <ActivityIndicator size="small" color={colors.text.primary} style={{ marginVertical: 10 }} />
+          ) : (
             <FlatList
-              data={SLIDER_IMAGES}
-              keyExtractor={(_, i) => i.toString()}
+              data={exerciseList}
+              keyExtractor={item => item.id.toString()}
               horizontal
               showsHorizontalScrollIndicator={false}
+              style={{ marginVertical: 12 }}
               renderItem={({ item }) => (
-                <TouchableOpacity onPress={() => {/* acción imagen */ }}>
+                <View style={{ alignItems: "center", marginRight: 5 }}>
                   <Image
-                    source={{ uri: item.uri ? item.uri : DEFAULT_IMAGE }}
+                    source={{
+                      uri:
+                        Array.isArray(item.photos) && item.photos.length > 0
+                          ? item.photos[0]
+                          : DEFAULT_IMAGE,
+                    }}
                     style={styles.sliderImage}
                     resizeMode="cover"
                   />
-                </TouchableOpacity>
+                </View>
               )}
             />
-          </View>
-
-          {/* Ejercicios en línea */}
+          )}
+          {/* Exercises */}
           <View style={styles.exerciseList}>
             <Text style={styles.exerciseText}>
-              {EXERCISES.join(", ")}
+              {exerciseList.map(e => capitalizeFirstLetter(e.name)).join(", ")}
             </Text>
           </View>
 
-          {/* Iconos de acción */}
+          {/* Action buttons */}
           <View style={styles.actionIconsRow}>
-            <TouchableOpacity style={styles.actionIcon} onPress={() => navigation.navigate("NextWorkout")} >
+            <TouchableOpacity
+              style={styles.actionIcon}
+              onPress={() => {
+                if (activeSession) {
+                  console.log("Redirecting to active workout");
+                  navigation.navigate("ActiveWorkout", {
+                    trainingSessionId: activeSession.id,
+                    split_id: activeSession.split_id,
+                    session_index: activeSession.session_index,
+                  });
+                } else {
+                  console.log("Redirecting to next workout");
+                  navigation.navigate("NextWorkout", {
+                    workout: nextWorkout,
+                    exercises: exerciseList,
+                  });
+                }
+              }}
+            >
               <FontAwesome5 name="play" size={22} color={colors.text.primary} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionIcon}>
-              <FontAwesome5 name="redo" size={22} color={colors.text.primary} />
+            <TouchableOpacity
+              style={styles.actionIcon}
+              disabled={!!activeSession}
+              onPress={async () => {
+                if (nextWorkout?.split_id && nextWorkout?.session_index !== undefined) {
+                  const success = await handleSkip(nextWorkout.split_id, nextWorkout.session_index);
+                  if (success) { refreshUser(); }
+                }
+              }}
+            >
+              <FontAwesome5 name="step-forward" size={22} color={colors.text.primary} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionIcon}>
+            <TouchableOpacity
+              style={styles.actionIcon}
+              onPress={() => shareWorkout(nextWorkout, exerciseList)}
+            >
               <FontAwesome5 name="share-alt" size={22} color={colors.text.primary} />
             </TouchableOpacity>
           </View>
+          {activeSession && (
+            <Text style={{ color: colors.text.warning, marginTop: 6, fontWeight: "bold" }}>
+              You have an active workout in progress. Finish it before skipping or starting a new one.
+            </Text>
+          )}
         </View>
 
         {/* Cards Row */}
         <View style={styles.cardsRow}>
           {/* Upcoming Workouts Card */}
-          <TouchableOpacity style={styles.cardHorizontal} onPress={() => {/* acción upcoming */ }}>
+          <TouchableOpacity style={styles.cardHorizontal} onPress={() => navigation.navigate("PlannedWorkoutsTest")} >
             <View style={styles.cardIconCircle}>
               <FontAwesome5
                 name="calendar-alt"
@@ -985,6 +1115,6 @@ export default function HomeScreen({ navigation }) {
           </View>
         </Modal>
       </View>
-    </ScrollView>
+    </ScrollView >
   );
 }

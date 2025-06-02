@@ -11,48 +11,108 @@ const GYM_TYPE_INFO = {
   "Large gym": {
     description: "A commercial gym with a wide variety of equipment and space. Ideal for all training styles.",
     defaultEquipment: [
-      "Flat Bench", "Incline Bench", "Adjustable Bench", "Squat Rack", "Power Rack", "Smith Machine", "Barbell",
-      "EZ Curl Bar", "Dumbbells", "Kettlebells", "Weight Plates", "Cable Machine", "Lat Pulldown Machine",
-      "Chest Press Machine", "Leg Press Machine", "Leg Curl Machine", "Leg Extension Machine", "Shoulder Press Machine",
-      "T-Bar Row Machine", "Pull-up Bar", "Dip Station", "Pec Deck / Chest Fly Machine", "Treadmill", "Stationary Bike",
-      "Rowing Machine", "Elliptical", "Air Bike (Assault Bike)", "Battle Ropes", "TRX / Suspension Trainer", "Foam Roller",
-      "Medicine Ball", "Wall Ball", "Sandbag", "Plyometric Box", "Jump Rope",
+      "Flat bench", "Incline bench", "Decline bench",  "Squat rack", "Power rack", "Smith machine",
+      "Barbell", "Ez curl bar", "Trap bar", "Safety squat bar", "Dumbbells", "Kettlebells", "Weight plates",
+      "Leg press machine", "Hack squat machine", "Leg curl machine", "Leg extension machine", "Hip thrust machine",
+      "Cable machine", "Cable row machine", "Lat pulldown machine", "Seated row machine", "Chest press machine",
+      "Pec deck / chest fly machine", "Shoulder press machine", "Preacher curl bench", "T-bar row machine",
+      "Glute ham developer (ghd)", "Sled (prowler)", "Landmine attachment", "Seated calf raise machine",
+      "Pull-up bar", "Dip station", "Push-up handles", "Resistance bands", "Trx / suspension trainer", "Battle ropes",
+      "Plyometric box", "Parallettes", "Ab roller", "Slamball", "Medicine ball", "Wall ball", "Sandbag", "Weight vest",
+      "Treadmill", "Stationary bike", "Spin bike", "Rowing machine", "Elliptical", "Stair climber", "Skierg",
+      "Air bike (assault bike)", "Jump rope", "Foam roller", "Massage gun", "Yoga mat", "Stretch bands",
+      "Balance ball (stability ball)", "Bosu ball", "Towel"
     ],
   },
   "Small gym": {
     description: "A smaller gym, typically with basic essentials. Good for focused or small group training.",
     defaultEquipment: [
-      "Adjustable Bench", "Squat Rack", "Barbell", "Dumbbells", "Kettlebells", "Pull-up Bar", "Resistance Bands",
-      "Leg Curl Machine", "Leg Extension Machine", "Cable Machine", "Treadmill", "Stationary Bike", "Rowing Machine",
-      "Dip Station", "TRX / Suspension Trainer", "Medicine Ball", "Foam Roller", "Jump Rope",
+      "Flat bench", "Incline bench",  "Squat rack", "Barbell", "Dumbbells", "Kettlebells",
+      "Pull-up bar", "Resistance bands", "Leg curl machine", "Leg extension machine", "Cable machine",
+      "Treadmill", "Stationary bike", "Rowing machine", "Dip station", "Trx / suspension trainer", "Medicine ball",
+      "Foam roller", "Jump rope", "Plyometric box", "Ab roller", "Sandbag", "Wall ball", "Push-up handles", "Towel"
     ],
   },
   "Garage gym": {
     description: "A home or garage setup. Usually compact and personalized.",
     defaultEquipment: [
-      "Dumbbells", "Pull-up Bar", "Resistance Bands", "Ab Roller", "Foam Roller", "Jump Rope",
+      "Dumbbells", "Kettlebells", "Pull-up bar", "Resistance bands", "Ab roller",
+      "Foam roller", "Jump rope", "Sandbag", "Medicine ball", "Towel"
     ],
   },
 };
 
+
 // All available equipment options
 const EQUIPMENT_OPTIONS = [
   // Strength Training
-  "Flat Bench", "Incline Bench", "Decline Bench", "Adjustable Bench", "Squat Rack", "Power Rack", "Smith Machine",
-  "Barbell", "EZ Curl Bar", "Trap Bar", "Safety Squat Bar", "Dumbbells", "Kettlebells", "Weight Plates", "Weight Tree",
-  "Leg Press Machine", "Hack Squat Machine", "Leg Curl Machine", "Leg Extension Machine", "Hip Thrust Machine",
-  "Cable Machine", "Lat Pulldown Machine", "Seated Row Machine", "Chest Press Machine", "Pec Deck / Chest Fly Machine",
-  "Shoulder Press Machine", "Preacher Curl Bench", "T-Bar Row Machine", "Glute Ham Developer (GHD)", "Sled (Prowler)",
-  "Landmine Attachment",
+  "Flat bench",
+  "Incline bench",
+  "Decline bench",
+  "Squat rack",
+  "Power rack",
+  "Smith machine",
+  "Barbell",
+  "Ez curl bar",
+  "Trap bar",
+  "Safety squat bar",
+  "Dumbbells",
+  "Kettlebells",
+  "Weight plates",
+  "Leg press machine",
+  "Hack squat machine",
+  "Leg curl machine",
+  "Leg extension machine",
+  "Hip thrust machine",
+  "Cable machine",
+  "Cable row machine",
+  "Lat pulldown machine",
+  "Seated row machine",
+  "Chest press machine",
+  "Pec deck / chest fly machine",
+  "Shoulder press machine",
+  "Preacher curl bench",
+  "T-bar row machine",
+  "Glute ham developer (ghd)",
+  "Sled (prowler)",
+  "Landmine attachment",
+  "Seated calf raise machine",
   // Functional & Bodyweight
-  "Pull-up Bar", "Dip Station", "Push-up Handles", "Resistance Bands", "TRX / Suspension Trainer", "Battle Ropes",
-  "Plyometric Box", "Parallettes", "Ab Roller", "Slamball", "Medicine Ball", "Wall Ball", "Sandbag", "Weight Vest",
+  "Pull-up bar",
+  "Dip station",
+  "Push-up handles",
+  "Resistance bands",
+  "Trx / suspension trainer",
+  "Battle ropes",
+  "Plyometric box",
+  "Parallettes",
+  "Ab roller",
+  "Slamball",
+  "Medicine ball",
+  "Wall ball",
+  "Sandbag",
+  "Weight vest",
   // Cardio
-  "Treadmill", "Stationary Bike", "Spin Bike", "Rowing Machine", "Elliptical", "Stair Climber", "SkiErg",
-  "Air Bike (Assault Bike)", "Jump Rope",
+  "Treadmill",
+  "Stationary bike",
+  "Spin bike",
+  "Rowing machine",
+  "Elliptical",
+  "Stair climber",
+  "Skierg",
+  "Air bike (assault bike)",
+  "Jump rope",
   // Mobility / Recovery
-  "Foam Roller", "Massage Gun", "Yoga Mat", "Stretch Bands", "Balance Ball (Stability Ball)", "Bosu Ball",
+  "Foam roller",
+  "Massage gun",
+  "Yoga mat",
+  "Stretch bands",
+  "Balance ball (stability ball)",
+  "Bosu ball",
+  // Unique/missing from exercises
+  "Towel"
 ];
+
 
 const gymTypes = [
   { label: "Large gym", value: "Large gym" },
@@ -429,7 +489,7 @@ export default function NewGym({ navigation, route }) {
       const updatedPerformanceData = {
         ...performanceData,
         stored_gyms: storedGyms,
-        active_gym: performanceData.active_gym || currentGymId,
+        active_gym: activeGym,
       };
 
       // Update UserSettings with the new performance_data
@@ -622,7 +682,10 @@ export default function NewGym({ navigation, route }) {
                 <FontAwesome5 name="times" size={20} color={colors.text.white} />
               </TouchableOpacity>
             </View>
-            <ScrollView style={styles.modalScroll}>
+            <ScrollView 
+              style={styles.modalScroll}
+              contentContainerStyle={{ paddingBottom: 40 }}
+            >
               {EQUIPMENT_OPTIONS.map((item) => (
                 <TouchableOpacity
                   key={item}

@@ -16,10 +16,11 @@ import MuscleIcon from "../../../global/components/MuscleIcon";
 import { supabase } from "../../../global/services/supabaseService";
 import { UserContext } from "../../../global/contexts/UserContext";
 import { capitalizeFirstLetter } from "../../../global/components/Normalize";
+import { generateAndStorePlannedWorkouts } from "../services/plannedWorkoutService";
 
 export default function RoutineInfoScreen({ navigation, route }) {
 	const { colors, typography } = useThemeContext();
-	const split_id = route.params?.split_id ?? 1; // Default to 1 if not provided
+	const split_id = route.params?.split_id ?? 1;
 	const [split, setSplit] = useState(null);
 	const [loading, setLoading] = useState(true);
 	const [isUpdating, setIsUpdating] = useState(false);
@@ -27,15 +28,18 @@ export default function RoutineInfoScreen({ navigation, route }) {
 	const [locallySelected, setLocallySelected] = useState(false);
 	const { user, refreshUser } = useContext(UserContext);
 
+	// Check if the current split is already selected by the user
 	const isSelected = user?.split?.id === split?.id;
 
+	// Handler for when the user selects a new routine/split
 	const handleSelectRoutine = async () => {
+		// Prevent duplicate actions or missing data
 		if (!user?.info?.id || !split?.id || isSelected || isUpdating || isUpdated) return;
 
 		setIsUpdating(true);
 		setLocallySelected(true);
 		try {
-			// 1. Update in supabase
+			// 1. Update the selected routine in Supabase
 			const { error } = await supabase
 				.from("UserSettings")
 				.update({ selected_routine: split.id })
@@ -43,17 +47,39 @@ export default function RoutineInfoScreen({ navigation, route }) {
 
 			if (error) throw error;
 
-			// 2. Refresh user data
-			refreshUser();
+			// 2. Refresh user data to get the updated split and settings
+			await refreshUser();
 
-			// 3. Show feedback
+			// 3. Gather all required data for workout generation
+			const userGoal = user?.settings?.fitness_goal || "Build muscle mass";
+			const workoutDuration = user?.settings?.app_preferences?.workout_duration || 60;
+			const gymId = user?.settings?.performance_data?.active_gym;
+
+			if (!gymId) {
+				// Warn if no gym is selected
+				console.warn("No active gym selected. Cannot generate planned workouts.");
+			} else {
+				// 4. Generate and store planned workouts for the selected split
+				await generateAndStorePlannedWorkouts({
+					userId: user.info.id,
+					split,
+					gymId,
+					userGoal,
+					workoutDuration
+				});
+			}
+
+			// 5. Show feedback to the user
 			setIsUpdated(true);
 		} catch (error) {
 			setLocallySelected(false);
 			console.error('Error selecting routine:', error);
+		} finally {
+			setIsUpdating(false);
 		}
 	};
 
+	// Fetch the split data from Supabase when the component mounts or split_id changes
 	useEffect(() => {
 		const fetchSplit = async () => {
 			setLoading(true);
@@ -68,6 +94,7 @@ export default function RoutineInfoScreen({ navigation, route }) {
 		if (split_id) fetchSplit();
 	}, [split_id]);
 
+	// Styles for the component
 	const styles = StyleSheet.create({
 		container: {
 			flex: 1,
@@ -101,7 +128,6 @@ export default function RoutineInfoScreen({ navigation, route }) {
 		routineDataGrid: {
 			flexDirection: "row",
 			flexWrap: "wrap",
-			// No border around the grid
 		},
 		routineDataCell: {
 			width: "50%",
@@ -170,11 +196,12 @@ export default function RoutineInfoScreen({ navigation, route }) {
 			position: "absolute",
 			left: 24,
 			right: 24,
-			bottom: 0, // Aumenté este valor para separarlo del borde inferior
+			bottom: 0,
 			zIndex: 10,
-		  },
+		},
 	});
 
+	// Show loading spinner while fetching split data
 	if (loading) {
 		return (
 			<View style={styles.container}>
@@ -183,6 +210,7 @@ export default function RoutineInfoScreen({ navigation, route }) {
 		);
 	}
 
+	// Show message if split not found
 	if (!split) {
 		return (
 			<View style={styles.container}>
@@ -195,7 +223,8 @@ export default function RoutineInfoScreen({ navigation, route }) {
 	const level = Array.isArray(split.level)
 		? split.level.join(", ")
 		: split.level;
-	// If workouts is a stringified JSON, parse it
+
+	// Parse workouts (handle both array and string formats)
 	let workouts = [];
 	if (Array.isArray(split.workouts)) {
 		workouts = split.workouts;
@@ -210,13 +239,13 @@ export default function RoutineInfoScreen({ navigation, route }) {
 	return (
 		<View style={styles.container}>
 			<BackButton onPress={() => navigation.goBack()} />
-			<ScrollView 
+			<ScrollView
 				showsVerticalScrollIndicator={false}
 				contentContainerStyle={{ paddingBottom: 70 }}
-				>
+			>
 				<ScreenTitle title={split.title || "Routine"} />
 
-				{/* Card 1: Routine info */}
+				{/* Routine info card */}
 				<View style={styles.card}>
 					<Text style={styles.cardTitle}>Routine info</Text>
 					<Text style={styles.cardText}>
@@ -224,7 +253,7 @@ export default function RoutineInfoScreen({ navigation, route }) {
 					</Text>
 				</View>
 
-				{/* Card 2: Routine data */}
+				{/* Routine data card */}
 				<View style={styles.routineDataCard}>
 					<View style={styles.routineDataGrid}>
 						<View
@@ -258,13 +287,14 @@ export default function RoutineInfoScreen({ navigation, route }) {
 					</View>
 				</View>
 
-				{/* Workouts Section */}
+				{/* Workouts overview section */}
 				<Text style={styles.sectionTitle}>Workouts</Text>
 				{workouts.length === 0 && (
 					<Text style={styles.cardText}>No workouts available.</Text>
 				)}
 				{workouts.map((workout, idx) => (
 					<View style={styles.workoutCard} key={idx}>
+						{/* Muscle icons */}
 						<View style={styles.muscleIconsRow}>
 							{(workout.main_muscles || []).map((muscle, i) => (
 								<View
@@ -310,7 +340,7 @@ export default function RoutineInfoScreen({ navigation, route }) {
 					</View>
 				))}
 			</ScrollView>
-			{/* Action Button */}
+			{/* Action Button for selecting the routine */}
 			<View style={styles.actionButtonWrapper}>
 				<ActionButton
 					text={
