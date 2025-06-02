@@ -19,6 +19,7 @@ import WorkoutExerciseScreen from "../features/workout/screens/WorkoutExerciseSc
 import ReplaceExerciseScreen from "../features/workout/screens/ReplaceExerciseScreen";
 import AddExerciseScreen from "../features/workout/screens/AddExerciseScreen";
 import ActiveWorkoutScreen from "../features/workout/screens/ActiveWorkoutScreen";
+import WorkoutSummaryScreen from "../features/workout/screens/WorkoutSummaryScreen";
 
 // Other features screens
 import ExerciseScreen from "../features/exercises/screens/ExerciseScreen";
@@ -36,6 +37,7 @@ export default function WorkoutStack() {
       <Stack.Screen name="ReplaceExercise" component={ReplaceExerciseScreen} />
       <Stack.Screen name="AddExercise" component={AddExerciseScreen} />
       <Stack.Screen name="ActiveWorkout" component={ActiveWorkoutScreen} />
+      <Stack.Screen name="WorkoutSummary" component={WorkoutSummaryScreen} />
 
       {/* Plan configuration screens */}
       <Stack.Screen name="FitnessPlan" component={FitnessPlanScreen} />

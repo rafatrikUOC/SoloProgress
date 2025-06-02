@@ -13,12 +13,12 @@ import useTrainingSession from "../hooks/useTrainingSession";
 import { useFocusEffect } from "@react-navigation/native";
 import { fetchExercises } from "../../exercises/services/exerciseService";
 import { useExerciseActions } from "../hooks/useExerciseActions";
-import { getData, clearData } from "../../../global/utils/storage";
 import { supabase } from "../../../global/services/supabaseService";
+import { loadSummary } from "../../workout/services/summaryService";
 
 const DEFAULT_IMAGE = "https://via.placeholder.com/60?text=No+Image";
-const SESSION_STORAGE_KEY = "active_training_session";
 
+// Helper to get muscle recovery percent (stub)
 function getMuscleRecovery(muscle, recoveryMap = {}) { return 100; }
 function getRecoveryColor(percent) {
     if (percent >= 80) return "#27ae60";
@@ -26,7 +26,6 @@ function getRecoveryColor(percent) {
     if (percent >= 20) return "#e67e22";
     return "#e74c3c";
 }
-
 function formatDuration(secs) {
     const h = Math.floor(secs / 3600);
     const m = Math.floor((secs % 3600) / 60);
@@ -52,25 +51,24 @@ export default function ActiveWorkoutScreen({ navigation, route }) {
     const [trainingSessionId, setTrainingSessionId] = useState(route.params?.trainingSessionId || null);
     const [workout, setWorkout] = useState(route.params?.workout || null);
     const [mainMuscles, setMainMuscles] = useState([]);
-    const recoveryMap = {};
-
-    // UI state
-    const [menuVisible, setMenuVisible] = useState(false);
-    const [selectedExercise, setSelectedExercise] = useState(null);
-    const [refreshFlag, setRefreshFlag] = useState(0);
-    const [allExercises, setAllExercises] = useState([]);
-    const [actionLoading, setActionLoading] = useState(false);
-    const [showFinishModal, setShowFinishModal] = useState(false);
     const [sessionStarted, setSessionStarted] = useState(false);
     const [sessionStartTime, setSessionStartTime] = useState(null);
     const [sessionDuration, setSessionDuration] = useState(0);
+    const [menuVisible, setMenuVisible] = useState(false);
+    const [selectedExercise, setSelectedExercise] = useState(null);
+    const [allExercises, setAllExercises] = useState([]);
+    const [actionLoading, setActionLoading] = useState(false);
+    const [showFinishModal, setShowFinishModal] = useState(false);
+    const recoveryMap = {};
 
-    // If no trainingSessionId, fetch the active session from DB for this user
+    const timerRef = useRef();
+
+    // Fetch active session if not provided
     useEffect(() => {
         if (trainingSessionId) return;
         async function fetchActiveSession() {
             if (!user?.info?.id) return;
-            const { data, error } = await supabase
+            const { data } = await supabase
                 .from("TrainingSessions")
                 .select("*")
                 .eq("user_id", user.info.id)
@@ -81,14 +79,48 @@ export default function ActiveWorkoutScreen({ navigation, route }) {
                 .single();
             if (data && data.id) {
                 setTrainingSessionId(data.id);
-                // You could also store the whole session object here if needed
-                console.log("[ActiveWorkoutScreen] Loaded trainingSessionId from DB:", data.id);
             }
         }
         fetchActiveSession();
     }, [trainingSessionId, user?.info?.id]);
 
-    // Load the training session data only when trainingSessionId is available
+    // Fetch session start_time from DB and set timer state
+    useEffect(() => {
+        if (!trainingSessionId) return;
+        let isMounted = true;
+        async function fetchSessionStart() {
+            const { data, error } = await supabase
+                .from("TrainingSessions")
+                .select("start_time, end_time")
+                .eq("id", trainingSessionId)
+                .single();
+            if (isMounted && data && data.start_time && !data.end_time) {
+                setSessionStarted(true);
+                setSessionStartTime(new Date(data.start_time).getTime());
+            } else {
+                setSessionStarted(false);
+                setSessionStartTime(null);
+            }
+        }
+        fetchSessionStart();
+        return () => { isMounted = false; };
+    }, [trainingSessionId]);
+
+    // Timer effect
+    useEffect(() => {
+        if (sessionStarted && sessionStartTime) {
+            timerRef.current = setInterval(() => {
+                setSessionDuration(Math.floor((Date.now() - sessionStartTime) / 1000));
+            }, 1000);
+            setSessionDuration(Math.floor((Date.now() - sessionStartTime) / 1000));
+        } else {
+            setSessionDuration(0);
+            if (timerRef.current) clearInterval(timerRef.current);
+        }
+        return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    }, [sessionStarted, sessionStartTime]);
+
+    // Load training session data
     const {
         trainingExercises,
         loading: loadingSession,
@@ -97,22 +129,16 @@ export default function ActiveWorkoutScreen({ navigation, route }) {
         user,
         workout,
         trainingSessionId,
-        refreshFlag,
     });
 
-    // Exercise actions hook
     const userId = user?.info?.id;
     const {
         excludeExercise,
         replaceExerciseFull,
         removeExerciseFull,
-        addExerciseFull,
     } = useExerciseActions({ userId, user });
 
-    // Timer ref
-    const timerRef = useRef();
-
-    // Fetch all exercises with full info for enrichment
+    // Fetch all exercises for enrichment
     useEffect(() => {
         let mounted = true;
         async function fetchAll() {
@@ -120,61 +146,44 @@ export default function ActiveWorkoutScreen({ navigation, route }) {
             const data = await fetchExercises(excluded);
             if (mounted) {
                 setAllExercises(data || []);
-                console.log("[ActiveWorkoutScreen] allExercises fetched:", (data || []).map(e => e.id));
             }
         }
         fetchAll();
         return () => { mounted = false; };
     }, [user?.settings?.performance_data?.excluded_exercises]);
 
-    // Refetch session data when coming back to this screen
     useFocusEffect(
         useCallback(() => {
             if (trainingSessionId) refetch();
         }, [refetch, trainingSessionId])
     );
 
-    // Retrieve workout info from session if not provided
     useEffect(() => {
         async function fetchWorkoutFromSession() {
-            console.log("[ActiveWorkoutScreen] fetchWorkoutFromSession called", { workout, trainingSessionId });
             if (workout) {
                 setMainMuscles(workout.details?.main_muscles || []);
                 return;
             }
             if (!trainingSessionId) return;
-
-            // 1. Get the TrainingSession from DB
-            const { data: session, error: sessionError } = await supabase
+            const { data: session } = await supabase
                 .from("TrainingSessions")
                 .select("split_id, session_index")
                 .eq("id", trainingSessionId)
                 .single();
-
-            console.log("[ActiveWorkoutScreen] TrainingSession fetch", { session, sessionError });
-
-            if (sessionError || !session?.split_id || session.session_index === undefined) return;
-
-            // 2. Get the UserPlannedWorkout from DB
-            const { data: plannedWorkout, error: workoutError } = await supabase
+            if (!session?.split_id || session.session_index === undefined) return;
+            const { data: plannedWorkout } = await supabase
                 .from("UserPlannedWorkouts")
                 .select("*")
                 .eq("split_id", session.split_id)
                 .eq("session_index", session.session_index)
                 .single();
-
-            console.log("[ActiveWorkoutScreen] UserPlannedWorkouts fetch", { plannedWorkout, workoutError });
-
-            if (workoutError || !plannedWorkout) return;
-
+            if (!plannedWorkout) return;
             setWorkout(plannedWorkout);
             setMainMuscles(plannedWorkout.details?.main_muscles || []);
         }
-
         fetchWorkoutFromSession();
     }, [workout, trainingSessionId]);
 
-    // Wait until both trainingExercises and allExercises are loaded
     const isReady =
         trainingSessionId &&
         !loadingSession &&
@@ -183,41 +192,24 @@ export default function ActiveWorkoutScreen({ navigation, route }) {
         Array.isArray(allExercises) &&
         allExercises.length > 0;
 
-    console.log("[ActiveWorkoutScreen] isReady:", isReady, {
-        trainingSessionId,
-        loadingSession,
-        trainingExercisesLength: trainingExercises?.length,
-        allExercisesLength: allExercises?.length,
-    });
-
-    // Enrich exercises with full info (muscles, etc.) only when ready
     const exercises = useMemo(() => {
         if (!isReady) return [];
-        const result = trainingExercises
+        return trainingExercises
             .filter(te => te && te.exercise_id)
             .map(te => {
                 const full = allExercises.find(e => e.id === te.exercise_id);
-                if (!full) {
-                    console.warn("[ActiveWorkoutScreen] Exercise not found in allExercises for trainingExercise:", te.exercise_id);
-                }
                 return { ...full, id: te.exercise_id };
             });
-        console.log("[ActiveWorkoutScreen] exercises to render:", result.map(e => e?.id));
-        return result;
     }, [isReady, trainingExercises, allExercises]);
 
-    // Only count exercises with effective sets (not warm-up)
     const exercisesWithEffectiveSets = useMemo(() => {
         if (!isReady) return [];
-        const result = exercises.filter(ex => {
+        return exercises.filter(ex => {
             const trainingEx = trainingExercises.find(te => te.exercise_id === ex.id);
             return trainingEx && trainingEx.series && trainingEx.series.some(s => !s.is_warmup);
         });
-        console.log("[ActiveWorkoutScreen] exercisesWithEffectiveSets:", result.map(e => e?.id));
-        return result;
     }, [isReady, exercises, trainingExercises]);
 
-    // Handle navigation to workout exercise details
     const handleExerciseInfoPress = (ex) => {
         const trainingEx = trainingExercises.find(te => te.exercise_id === ex.id);
         navigation.navigate("WorkoutExercise", {
@@ -227,12 +219,10 @@ export default function ActiveWorkoutScreen({ navigation, route }) {
         });
     };
 
-    // Handle navigation to exercise general info
     const handleExerciseImagePress = (ex) => {
         navigation.navigate("Exercise", { exerciseId: ex.id });
     };
 
-    // Handle contextual menu actions
     const handleMenuOption = async (option, ex) => {
         setMenuVisible(false);
         setSelectedExercise(null);
@@ -241,7 +231,6 @@ export default function ActiveWorkoutScreen({ navigation, route }) {
 
         try {
             setActionLoading(true);
-
             switch (option.key) {
                 case "replace":
                     navigation.navigate("ReplaceExercise", {
@@ -302,49 +291,27 @@ export default function ActiveWorkoutScreen({ navigation, route }) {
         }
     };
 
-    // On mount: check if session already started (from storage)
-    useEffect(() => {
-        let isMounted = true;
-        (async () => {
-            const data = await getData(SESSION_STORAGE_KEY);
-            console.log("[ActiveWorkoutScreen] SESSION_STORAGE_KEY getData:", data, trainingSessionId);
-            if (isMounted && data && data.trainingSessionId === trainingSessionId) {
-                setSessionStarted(true);
-                setSessionStartTime(data.startTime);
-            }
-        })();
-        return () => { isMounted = false; };
-    }, [trainingSessionId]);
-
-    // Start timer when session starts
-    useEffect(() => {
-        console.log("[ActiveWorkoutScreen] useEffect sessionStarted/sessionStartTime", sessionStarted, sessionStartTime);
-        if (sessionStarted && sessionStartTime) {
-            timerRef.current = setInterval(() => {
-                setSessionDuration(Math.floor((Date.now() - sessionStartTime) / 1000));
-            }, 1000);
-            setSessionDuration(Math.floor((Date.now() - sessionStartTime) / 1000));
-        } else {
-            setSessionDuration(0);
-            if (timerRef.current) clearInterval(timerRef.current);
-        }
-        return () => { if (timerRef.current) clearInterval(timerRef.current); };
-    }, [sessionStarted, sessionStartTime]);
-
-    // Finish workout: set end_time in DB and clear storage
     const handleFinishWorkout = async () => {
         setShowFinishModal(false);
         setActionLoading(true);
-        const now = new Date();
-        await supabase
-            .from("TrainingSessions")
-            .update({ end_time: now.toISOString() })
-            .eq("id", trainingSessionId);
-        setSessionStarted(false);
-        setSessionStartTime(null);
-        setSessionDuration(0);
-        setActionLoading(false);
-        navigation.navigate("Home");
+
+        try {
+            const summary = await loadSummary(trainingSessionId);
+
+            setSessionStarted(false);
+            setSessionStartTime(null);
+            setSessionDuration(0);
+            setActionLoading(false);
+
+            navigation.replace("WorkoutSummary", {
+                trainingSessionId,
+                summary,
+            });
+        } catch (err) {
+            setActionLoading(false);
+            alert("There was an error saving your workout summary.");
+            console.error(err);
+        }
     };
 
     // Styles
@@ -473,37 +440,77 @@ export default function ActiveWorkoutScreen({ navigation, route }) {
             justifyContent: "center",
             alignItems: "center",
         },
-        modalOverlay: {
+        // Contextual menu styles (for menuVisible)
+        menuOverlayContext: {
             flex: 1,
             backgroundColor: "rgba(0,0,0,0.3)",
             justifyContent: "flex-end",
         },
-        menuModal: {
+        menuModalContext: {
             backgroundColor: colors.card,
             padding: 16,
             borderTopLeftRadius: 16,
             borderTopRightRadius: 16,
         },
-        menuOption: {
+        menuOptionContext: {
             flexDirection: "row",
             alignItems: "center",
             paddingVertical: 14,
             borderBottomWidth: 1,
             borderBottomColor: colors.body,
         },
-        menuOptionText: {
+        menuOptionTextContext: {
             color: colors.text.white,
             fontSize: 16,
             marginLeft: 12,
         },
-        menuCancel: {
+        menuCancelContext: {
             marginTop: 12,
             alignItems: "center",
         },
-        menuCancelText: {
+        menuCancelTextContext: {
             color: colors.text.muted,
             fontSize: 16,
             fontWeight: "bold",
+        },
+        // Finish modal styles (for showFinishModal)
+        modalOverlay: {
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.4)",
+            justifyContent: "center",
+            alignItems: "center",
+        },
+        menuModal: {
+            backgroundColor: colors.card,
+            padding: 16,
+            borderTopLeftRadius: 16,
+            borderTopRightRadius: 16,
+            marginHorizontal: 16,
+        },
+        modalBtn: {
+            flex: 1,
+            paddingVertical: 12,
+            paddingHorizontal: 18,
+            borderRadius: 12,
+            backgroundColor: colors.text.primary,
+            alignItems: "center",
+            justifyContent: "center",
+            minWidth: 90,
+            marginHorizontal: 0,
+        },
+        modalBtnCancel: {
+            backgroundColor: colors.card,
+            borderWidth: 1.5,
+            borderColor: colors.text.primary,
+        },
+        modalBtnText: {
+            color: colors.card,
+            fontWeight: "bold",
+            fontSize: 16,
+            letterSpacing: 0.5,
+        },
+        modalBtnTextCancel: {
+            color: colors.text.primary,
         },
         scrollContent: {
             paddingBottom: 110,
@@ -549,31 +556,39 @@ export default function ActiveWorkoutScreen({ navigation, route }) {
             fontSize: 16,
         },
         timerBox: {
+            position: "absolute",
+            top: 36,
+            right: 24,
+            backgroundColor: colors.text.primary + "EE",
+            borderRadius: 24,
             flexDirection: "row",
             alignItems: "center",
-            justifyContent: "center",
-            marginTop: 12,
-            marginBottom: 4,
-            paddingVertical: 8,
+            paddingVertical: 6,
+            paddingHorizontal: 16,
+            elevation: 6,
+            shadowColor: "#000",
+            shadowOpacity: 0.13,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 2 },
+            zIndex: 100,
         },
         timerIcon: {
-            marginRight: 8,
+            marginRight: 7,
         },
         timerText: {
-            color: "#fff",
-            fontSize: 28,
+            color: colors.text.white,
             fontWeight: "bold",
-            letterSpacing: 1.2,
+            fontSize: 16,
+            letterSpacing: 1.1,
         },
     });
 
-    // Show loading spinner while session and series are being created or data is not ready
+    // Show loading spinner if not ready
     if (!isReady) {
-        console.log("[ActiveWorkoutScreen] Loading... waiting for isReady");
         return (
             <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
                 <ActivityIndicator size="large" color={colors.text.primary} />
-                <Text style={{ color: colors.text.primary, marginTop: 16 }}>Starting your workout...</Text>
+                <Text style={{ color: colors.text.primary, marginTop: 16 }}>Loading workout...</Text>
             </View>
         );
     }
@@ -593,7 +608,7 @@ export default function ActiveWorkoutScreen({ navigation, route }) {
             {/* Session timer */}
             {sessionStarted && (
                 <View style={styles.timerBox}>
-                    <MaterialIcons name="timer" size={32} color={colors.text.primary} style={styles.timerIcon} />
+                    <MaterialIcons name="timer" size={32} color={colors.text.card + "99"} style={styles.timerIcon} />
                     <Text style={styles.timerText}>{formatDuration(sessionDuration)}</Text>
                 </View>
             )}
@@ -603,6 +618,7 @@ export default function ActiveWorkoutScreen({ navigation, route }) {
                 contentContainerStyle={styles.scrollContent}
             >
                 <ScreenTitle title={workout?.title || "Active workout"} />
+
                 {/* Target muscles summary */}
                 <Text style={styles.sectionTitle}>Target muscles</Text>
                 <ScrollView
@@ -640,13 +656,8 @@ export default function ActiveWorkoutScreen({ navigation, route }) {
 
                 {/* Exercise list with sets x reps summary */}
                 {exercises.map((ex, idx) => {
-                    // Find the corresponding TrainingExercise with series
                     const trainingEx = trainingExercises.find(te => te.exercise_id === ex.id);
-
-                    // Only render if series are available
                     if (!trainingEx || !trainingEx.series || trainingEx.series.length === 0) return null;
-
-                    // Only count effective sets (not warm-up)
                     const effectiveSeries = trainingEx.series.filter(s => !s.is_warmup);
                     const seriesCount = effectiveSeries.length;
                     const repsSet = [...new Set(effectiveSeries.map(s => s.reps))];
@@ -697,6 +708,7 @@ export default function ActiveWorkoutScreen({ navigation, route }) {
                     );
                 })}
 
+                {/* Add exercise button */}
                 <View style={styles.addSetRow}>
                     <TouchableOpacity
                         style={styles.addSetIconWrapper}
@@ -732,15 +744,15 @@ export default function ActiveWorkoutScreen({ navigation, route }) {
                     setSelectedExercise(null);
                 }}
             >
-                <Pressable style={styles.modalOverlay} onPress={() => {
+                <Pressable style={styles.menuOverlayContext} onPress={() => {
                     setMenuVisible(false);
                     setSelectedExercise(null);
                 }}>
-                    <View style={styles.menuModal}>
+                    <View style={styles.menuModalContext}>
                         {MENU_OPTIONS.map((option, idx) => (
                             <TouchableOpacity
                                 key={idx}
-                                style={styles.menuOption}
+                                style={styles.menuOptionContext}
                                 onPress={() => {
                                     if (selectedExercise) handleMenuOption(option, selectedExercise);
                                 }}
@@ -750,7 +762,7 @@ export default function ActiveWorkoutScreen({ navigation, route }) {
                                 )}
                                 <Text
                                     style={[
-                                        styles.menuOptionText,
+                                        styles.menuOptionTextContext,
                                         option.danger && { color: colors.text.danger },
                                     ]}
                                 >
@@ -758,6 +770,15 @@ export default function ActiveWorkoutScreen({ navigation, route }) {
                                 </Text>
                             </TouchableOpacity>
                         ))}
+                        <TouchableOpacity
+                            style={styles.menuCancelContext}
+                            onPress={() => {
+                                setMenuVisible(false);
+                                setSelectedExercise(null);
+                            }}
+                        >
+                            <Text style={styles.menuCancelTextContext}>Cancel</Text>
+                        </TouchableOpacity>
                     </View>
                 </Pressable>
             </Modal>
@@ -774,7 +795,7 @@ export default function ActiveWorkoutScreen({ navigation, route }) {
             <Modal visible={showFinishModal} transparent animationType="fade">
                 <Pressable style={styles.modalOverlay} onPress={() => setShowFinishModal(false)}>
                     <Pressable style={styles.menuModal} onPress={e => e.stopPropagation()}>
-                        <Text style={{ color: colors.text.primary, fontWeight: "bold", fontSize: 20, marginBottom: 16, textAlign: "center" }}>
+                        <Text style={{ color: colors.text.white, fontWeight: "bold", fontSize: 20, marginBottom: 16, textAlign: "center" }}>
                             Are you sure you want to finish the workout?
                         </Text>
                         <View style={{ flexDirection: "row", marginTop: 18, gap: 18 }}>

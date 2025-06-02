@@ -106,8 +106,8 @@ export default function MiniTimer({
       marginHorizontal: 2,
     },
     sideText: {
-      color: colors.text.primary,
-      fontSize: 17,
+      color: colors.text.primary + "99",
+      fontSize: 14,
       fontWeight: "bold",
       marginRight: 2,
       marginLeft: 2,
@@ -120,7 +120,7 @@ export default function MiniTimer({
       justifyContent: "center",
     },
     timeText: {
-      color: colors.text.primary,
+      color: colors.text.white,
       fontWeight: "bold",
       fontSize: 23,
       textAlign: "center",

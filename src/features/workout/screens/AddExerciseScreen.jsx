@@ -95,14 +95,14 @@ export default function AddExerciseScreen({ navigation, route }) {
     const handleBack = () => navigation.goBack();
 
     const styles = StyleSheet.create({
-        container: { flex: 1, backgroundColor: colors.body, padding: 0 },
+        container: { flex: 1, backgroundColor: colors.body, padding: 24 },
         resultsContainer: { flex: 1, backgroundColor: colors.body, marginTop: 0 },
         searchInput: {
             backgroundColor: colors.card,
             color: colors.text.primary,
             borderRadius: 8,
             padding: 10,
-            margin: 18,
+            marginVertical: 18,
             fontSize: 16,
         },
         noResultsText: {
