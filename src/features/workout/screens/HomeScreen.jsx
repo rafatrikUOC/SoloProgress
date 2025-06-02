@@ -22,6 +22,7 @@ import { supabase } from "../../../global/services/supabaseService";
 import useNextWorkout from '../hooks/useNextWorkout';
 import useSkipSession from '../hooks/useSkipSession';
 import { shareWorkout } from "../../../global/utils/share";
+import { generateAndStorePlannedWorkouts } from "../services/plannedWorkoutService";
 
 const DEFAULT_IMAGE = "https://placehold.co/400";
 
@@ -71,11 +72,32 @@ async function fetchGymDetailsById(gym_id) {
   };
 }
 
+// Next workout loading
+function LoadingNextWorkout({ colors }) {
+  return (
+    <View style={{
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      padding: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}>
+      <Text style={{ color: colors.text.primary, fontSize: 18, fontWeight: 'bold', marginBottom: 8 }}>
+        Preparing your next workout...
+      </Text>
+      <Text style={{ color: colors.text.muted, fontSize: 14, textAlign: 'center' }}>
+        Make sure you've selected a gym and have an active training split
+      </Text>
+    </View>
+  );
+}
+
 export default function HomeScreen({ navigation }) {
   const { colors, typography } = useThemeContext();
   const { user, refreshUser } = useContext(UserContext);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [activeSession, setActiveSession] = useState(null);
+  const [generatingWorkouts, setGeneratingWorkouts] = useState(false);
 
   // Show "Coming soon" alert for all WIP features
   const launchWorkInProgress = () => {
@@ -106,6 +128,40 @@ export default function HomeScreen({ navigation }) {
     }
     fetchActiveSession();
   }, [user?.info?.id]);
+
+  // Initialize planned workouts
+  useEffect(() => {
+    if (!activeSession && !nextWorkout) {
+      setGeneratingWorkouts(true);
+      async function initializePlannedWorkouts() {
+        const split = user?.split;
+        const gymId = user?.settings?.performance_data?.active_gym;
+        const userGoal = user?.settings?.fitness_goal || "Build muscle mass";
+        const workoutDuration = user?.settings?.app_preferences?.workout_duration || 60;
+
+        if (!split || !gymId || !workoutDuration) {
+          // No gym, split or workout duration? Then don't generate anything
+          return;
+        }
+
+        if (split && gymId && workoutDuration) {
+          try {
+            await generateAndStorePlannedWorkouts({
+              userId: user.info.id,
+              split,
+              gymId,
+              userGoal,
+              workoutDuration,
+            });
+          } catch (error) {
+            console.error("Error in generateAndStorePlannedWorkouts:", error);
+          }
+        }
+        setGeneratingWorkouts(false);
+      }
+      initializePlannedWorkouts();
+    }
+  }, [activeSession, nextWorkout, user]);
 
   // Toast and password logic
   useEffect(() => {
@@ -219,10 +275,10 @@ export default function HomeScreen({ navigation }) {
 
       setGymsDetails(prev => prev.filter(g => g.id !== gymId));
       setLocalActiveGym(newActiveGym);
-      refreshUser && refreshUser();
     } else {
       console.error(`[Gym] Error updating user settings:`, updateError);
     }
+    refreshUser && refreshUser();
   };
 
   const openGymMenu = (gymId) => setMenuGymId(gymId);
@@ -465,7 +521,8 @@ export default function HomeScreen({ navigation }) {
       backgroundColor: colors.body,
     },
     container: {
-      padding: 24
+      padding: 24,
+      paddingTop: 36,
     },
     header: {
       flexDirection: "row",
@@ -822,108 +879,114 @@ export default function HomeScreen({ navigation }) {
         </View>
 
         {/* Next workout card */}
-        <View style={styles.nextWorkoutCard}>
-          <View style={styles.nextWorkoutHeaderPill}>
-            <Text style={styles.nextWorkoutHeaderText}>
-              {`Next workout — ${nextWorkout?.title || "?"}`}
-              {activeSession && <Text style={{ color: colors.text.white }}> (Active)</Text>}
-            </Text>
-          </View>
+        {(!nextWorkout && !activeSession) ?
+          (<View style={styles.nextWorkoutCard}><LoadingNextWorkout colors={colors} /></View>)
+          : (
+            <View style={styles.nextWorkoutCard}>
+              <View style={styles.nextWorkoutHeaderPill}>
+                <Text style={styles.nextWorkoutHeaderText}>
+                  {`Next workout — ${nextWorkout?.title || "?"}`}
+                  {activeSession && <Text style={{ color: colors.text.white }}> (Active)</Text>}
+                </Text>
+              </View>
 
-          {/* Workout main muscles */}
-          <Text style={styles.nextWorkoutMuscles}>
-            {joinAndCapitalize(nextWorkout?.details?.main_muscles || [])}
-          </Text>
-          <Text style={styles.nextWorkoutDetails}>
-            {`${nextWorkout?.details?.duration || "?"} minutes - ${nextWorkout?.exercises?.length || 0} exercises`}
-          </Text>
+              {/* Workout main muscles */}
+              <Text style={styles.nextWorkoutMuscles}>
+                {joinAndCapitalize(nextWorkout?.details?.main_muscles || [])}
+              </Text>
+              <Text style={styles.nextWorkoutDetails}>
+                {`${nextWorkout?.details?.duration || "?"} minutes - ${nextWorkout?.exercises?.length || 0} exercises`}
+              </Text>
 
-          {/* Exercise image slider */}
-          {loadingExercises ? (
-            <ActivityIndicator size="small" color={colors.text.primary} style={{ marginVertical: 10 }} />
-          ) : (
-            <FlatList
-              data={exerciseList}
-              keyExtractor={item => item.id.toString()}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={{ marginVertical: 12 }}
-              renderItem={({ item }) => (
-                <View style={{ alignItems: "center", marginRight: 5 }}>
-                  <Image
-                    source={{
-                      uri:
-                        Array.isArray(item.photos) && item.photos.length > 0
-                          ? item.photos[0]
-                          : DEFAULT_IMAGE,
-                    }}
-                    style={styles.sliderImage}
-                    resizeMode="cover"
-                  />
-                </View>
+              {/* Exercise image slider */}
+              {loadingExercises ? (
+                <ActivityIndicator size="small" color={colors.text.primary} style={{ marginVertical: 10 }} />
+              ) : (
+                <FlatList
+                  data={exerciseList}
+                  keyExtractor={item => item.id.toString()}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={{ marginVertical: 12 }}
+                  renderItem={({ item }) => (
+                    <View style={{ alignItems: "center", marginRight: 5 }}>
+                      <Image
+                        source={{
+                          uri:
+                            Array.isArray(item.photos) && item.photos.length > 0
+                              ? item.photos[0]
+                              : DEFAULT_IMAGE,
+                        }}
+                        style={styles.sliderImage}
+                        resizeMode="cover"
+                      />
+                    </View>
+                  )}
+                />
               )}
-            />
-          )}
-          {/* Exercises */}
-          <View style={styles.exerciseList}>
-            <Text style={styles.exerciseText}>
-              {exerciseList.map(e => capitalizeFirstLetter(e.name)).join(", ")}
-            </Text>
-          </View>
+              {/* Exercises */}
+              <View style={styles.exerciseList}>
+                <Text style={styles.exerciseText}>
+                  {exerciseList.map(e => capitalizeFirstLetter(e.name)).join(", ")}
+                </Text>
+              </View>
 
-          {/* Action buttons */}
-          <View style={styles.actionIconsRow}>
-            <TouchableOpacity
-              style={styles.actionIcon}
-              onPress={() => {
-                if (activeSession) {
-                  console.log("Redirecting to active workout");
-                  navigation.navigate("ActiveWorkout", {
-                    trainingSessionId: activeSession.id,
-                    split_id: activeSession.split_id,
-                    session_index: activeSession.session_index,
-                  });
-                } else {
-                  console.log("Redirecting to next workout");
-                  navigation.navigate("NextWorkout", {
-                    workout: nextWorkout,
-                    exercises: exerciseList,
-                  });
-                }
-              }}
-            >
-              <FontAwesome5 name="play" size={22} color={colors.text.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionIcon}
-              disabled={!!activeSession}
-              onPress={async () => {
-                if (nextWorkout?.split_id && nextWorkout?.session_index !== undefined) {
-                  const success = await handleSkip(nextWorkout.split_id, nextWorkout.session_index);
-                  if (success) { refreshUser(); }
-                }
-              }}
-            >
-              <FontAwesome5 name="step-forward" size={22} color={colors.text.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionIcon}
-              onPress={() => shareWorkout(nextWorkout, exerciseList)}
-            >
-              <FontAwesome5 name="share-alt" size={22} color={colors.text.primary} />
-            </TouchableOpacity>
-          </View>
-          {activeSession && (
-            <Text style={{ color: colors.text.warning, marginTop: 6, fontWeight: "bold" }}>
-              You have an active workout in progress. Finish it before skipping or starting a new one.
-            </Text>
-          )}
-        </View>
+              {/* Action buttons */}
+              <View style={styles.actionIconsRow}>
+                <TouchableOpacity
+                  style={styles.actionIcon}
+                  onPress={() => {
+                    if (activeSession) {
+                      console.log("Redirecting to active workout");
+                      navigation.navigate("ActiveWorkout", {
+                        trainingSessionId: activeSession.id,
+                        split_id: activeSession.split_id,
+                        session_index: activeSession.session_index,
+                      });
+                    } else {
+                      console.log("Redirecting to next workout");
+                      navigation.navigate("NextWorkout", {
+                        workout: nextWorkout,
+                        exercises: exerciseList,
+                      });
+                    }
+                  }}
+                >
+                  <FontAwesome5 name="play" size={22} color={colors.text.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionIcon}
+                  disabled={!!activeSession}
+                  onPress={async () => {
+                    if (nextWorkout?.split_id && nextWorkout?.session_index !== undefined) {
+                      const success = await handleSkip(nextWorkout.split_id, nextWorkout.session_index);
+                      if (success) { refreshUser(); }
+                    }
+                  }}
+                >
+                  <FontAwesome5 name="step-forward" size={22} color={colors.text.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionIcon}
+                  onPress={() => shareWorkout(nextWorkout, exerciseList)}
+                >
+                  <FontAwesome5 name="share-alt" size={22} color={colors.text.primary} />
+                </TouchableOpacity>
+              </View>
+              {activeSession && (
+                <Text style={{ color: colors.text.warning, marginTop: 6, fontWeight: "bold" }}>
+                  You have an active workout in progress. Finish it before skipping or starting a new one.
+                </Text>
+              )}
+            </View>)};
 
         {/* Cards Row */}
         <View style={styles.cardsRow}>
           {/* Upcoming Workouts Card */}
-          <TouchableOpacity style={styles.cardHorizontal} onPress={() => navigation.navigate("PlannedWorkoutsTest")} >
+          <TouchableOpacity
+            style={styles.cardHorizontal}
+            onPress={launchWorkInProgress}
+          >
             <View style={styles.cardIconCircle}>
               <FontAwesome5
                 name="calendar-alt"

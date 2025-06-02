@@ -61,11 +61,11 @@ export const registerUser = async (data) => {
     const { error: settingsError } = await supabase.from("UserSettings").insert([
       {
         user_id: userId,
-        units: JSON.stringify({
+        units: {
           weight: weightUnit,
           height: heightUnit,
-        }),
-        app_preferences: JSON.stringify({
+        },
+        app_preferences: {
           "workout_duration": 60,
           "dropsets": true,
           "rest_time": {
@@ -88,11 +88,11 @@ export const registerUser = async (data) => {
               "Straight"
             ]
           }
-        }),
+        },
         fitness_goal: goal,
-        performance_data: JSON.stringify({
+        performance_data: {
           activity_level: activityLevel,
-        }),
+        },
         weekly_goal: 4,
         selected_routine: 1,
       },
@@ -103,22 +103,23 @@ export const registerUser = async (data) => {
     }
 
     // Step 4: Insert initial measurements (age, weight, height)
+    const getCurrentDate = () => new Date().toISOString().split("T")[0];
     const { error: measurementsError } = await supabase.from("Measurements").insert([
       {
         user_id: userId,
-        date: new Date().toISOString().split("T")[0],
+        date: getCurrentDate(),
         key: "weight_" + weightUnit,
         value: weight,
       },
       {
         user_id: userId,
-        date: new Date().toISOString().split("T")[0],
+        date: getCurrentDate(),
         key: "height_" + heightUnit,
         value: height,
       },
       {
         user_id: userId,
-        date: new Date().toISOString().split("T")[0],
+        date: getCurrentDate(),
         key: "age",
         value: age,
       },
@@ -143,10 +144,9 @@ export const checkIfEmailExists = async (email) => {
     const { data, error } = await supabase
       .from("Users")
       .select("email")
-      .ilike("email", normalizedEmail)
-      .single();
+      .ilike("email", normalizedEmail);
 
-    if (error) return null; // Email not found
+    if (error) return false;
     return data;
   } catch (error) {
     console.error("Error checking email:", error);
@@ -161,8 +161,7 @@ export const checkIfUsernameExists = async (username) => {
     const { data, error } = await supabase
       .from("Users")
       .select("username")
-      .ilike("username", normalizedUsername)
-      .single();
+      .ilike("username", normalizedUsername);
 
     if (error) return null; // Username not found
     return data;
@@ -269,8 +268,7 @@ export const getUserIDByEmail = async (email) => {
     const { data, error } = await supabase
       .from("Users")
       .select("id")
-      .ilike("email", normalizedEmail)
-      .single();
+      .ilike("email", normalizedEmail);
 
     if (error) throw new Error(error.message);
     return data.id;
@@ -287,8 +285,7 @@ export const getUserIDByUsername = async (username) => {
     const { data, error } = await supabase
       .from("Users")
       .select("id")
-      .ilike("username", normalizedUsername)
-      .single();
+      .ilike("username", normalizedUsername);
 
     if (error) throw new Error(error.message);
     return data;

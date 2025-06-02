@@ -14,7 +14,6 @@ import WorkoutDurationScreen from "../features/workout/screens/WorkoutDurationSc
 import AdvancedSettingsScreen from "../features/workout/screens/AdvancedSettingsScreen";
 import NewGymScreen from "../features/workout/screens/NewGymScreen";
 import RoutineLibraryScreen from "../features/workout/screens/RoutineLibraryScreen";
-import PlannedWorkoutsTestScreen from "../features/workout/screens/PlannedWorkoutsTestScreen";
 import WorkoutExerciseScreen from "../features/workout/screens/WorkoutExerciseScreen";
 import ReplaceExerciseScreen from "../features/workout/screens/ReplaceExerciseScreen";
 import AddExerciseScreen from "../features/workout/screens/AddExerciseScreen";
@@ -52,9 +51,6 @@ export default function WorkoutStack() {
 
       {/* Other stack features screens */}
       <Stack.Screen name="Exercise" component={ExerciseScreen} />
-
-      {/* TODO: TESTING, PLEASE REMOVE */}
-      <Stack.Screen name="PlannedWorkoutsTest" component={PlannedWorkoutsTestScreen} />
     </Stack.Navigator>
   );
 }

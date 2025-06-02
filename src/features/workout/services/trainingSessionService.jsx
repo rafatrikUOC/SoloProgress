@@ -465,7 +465,6 @@ export async function getNextWorkoutForUser(user) {
   return next || null;
 }
 
-// TODO: Check if still needed after creating createTrainingExercisesAndSeries
 // Replaces the exercise in a TrainingExercise and regenerates its series
 export async function replaceExerciseAndRegenerateSeries({ trainingExerciseId, newExerciseId, user }) {
   // 1. Update the exercise_id
@@ -524,7 +523,6 @@ export async function replaceExerciseAndRegenerateSeries({ trainingExerciseId, n
   }
 }
 
-// TODO: Check if still needed after creating createTrainingExercisesAndSeries
 // Replaces an exercise in both the planned workout and the active session. Handles DB updates and regeneration of series
 export async function replaceExerciseEverywhere({
   plannedWorkoutId,      
