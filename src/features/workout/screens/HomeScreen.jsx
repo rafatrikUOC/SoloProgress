@@ -9,6 +9,7 @@ import {
   Image,
   FlatList,
   ActivityIndicator,
+  Alert
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useIsFocused } from "@react-navigation/native";
@@ -75,6 +76,14 @@ export default function HomeScreen({ navigation }) {
   const { user, refreshUser } = useContext(UserContext);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [activeSession, setActiveSession] = useState(null);
+
+  // Show "Coming soon" alert for all WIP features
+  const launchWorkInProgress = () => {
+    Alert.alert(
+      "Coming soon",
+      "This feature will be available in a future update."
+    );
+  };
 
   // Check if there is an unfinished TrainingSession for the user
   useEffect(() => {
@@ -928,7 +937,7 @@ export default function HomeScreen({ navigation }) {
           {/* Recovery Card */}
           <TouchableOpacity
             style={[styles.cardHorizontal, { marginRight: 0 }]}
-            onPress={() => {/* acción recovery */ }}
+            onPress={launchWorkInProgress}
           >
             <View
               style={[
@@ -955,6 +964,7 @@ export default function HomeScreen({ navigation }) {
             <TouchableOpacity
               key={index}
               style={styles.customButton}
+              onPress={launchWorkInProgress}
             >
               <View style={styles.customIconCircle}>
                 <FontAwesome5
@@ -985,7 +995,7 @@ export default function HomeScreen({ navigation }) {
             <TouchableOpacity
               key={index}
               style={styles.trendBox}
-              onPress={() => {/* acción trend */ }}
+              onPress={launchWorkInProgress}
             >
               <View style={styles[`iconCircle_${color}`]}>
                 <FontAwesome5
